@@ -5,6 +5,10 @@ import {
 } from 'electron'
 
 import {
+  registerSalesIpc
+} from './ipc/sales'
+
+import {
   registerUsersIpc
 } from './ipc/users'
 
@@ -158,7 +162,7 @@ app.whenReady().then(() => {
   registerCategoriesIpc()
   registerInventoryIpc()
   registerUsersIpc()
-
+  registerSalesIpc()
 
 
   createWindow()

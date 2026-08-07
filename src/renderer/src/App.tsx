@@ -9,6 +9,9 @@ import CategoriesPage
 import LoginPage
   from './pages/LoginPage'
 
+import SalesPage
+  from './pages/SalesPage'
+
 import SetupPage
   from './pages/SetupPage'
 
@@ -25,13 +28,15 @@ interface AuthUser {
 }
 
 interface AuthStatus {
-  setupRequired: boolean
+  setupRequired:
+    boolean
 
   user:
     AuthUser | null
 }
 
-type AdminPage =
+type AppPage =
+  | 'sales'
   | 'categories'
   | 'users'
 
@@ -46,14 +51,17 @@ React.JSX.Element {
     )
 
   const [
-    adminPage,
-    setAdminPage
+    currentPage,
+    setCurrentPage
   ] =
-    useState<AdminPage>(
-      'categories'
+    useState<AppPage>(
+      'sales'
     )
 
-  const [error, setError] =
+  const [
+    error,
+    setError
+  ] =
     useState<string | null>(
       null
     )
@@ -96,6 +104,10 @@ React.JSX.Element {
   function handleAuthentication(
     user: AuthUser
   ): void {
+    setCurrentPage(
+      'sales'
+    )
+
     setAuthStatus({
       setupRequired: false,
       user
@@ -125,8 +137,8 @@ React.JSX.Element {
       return
     }
 
-    setAdminPage(
-      'categories'
+    setCurrentPage(
+      'sales'
     )
 
     setAuthStatus({
@@ -139,7 +151,9 @@ React.JSX.Element {
     return (
       <main className="auth-page">
         <section className="auth-card">
-          <h1>Error</h1>
+          <h1>
+            Error
+          </h1>
 
           <div className="message message-error">
             {error}
@@ -193,47 +207,69 @@ React.JSX.Element {
           Sistema POS
         </strong>
 
-        {user.role === 'ADMIN' && (
-          <nav className="admin-nav">
-            <button
-              type="button"
-              className={
-                `nav-button ${
-                  adminPage ===
-                  'categories'
-                    ? 'nav-button-active'
-                    : ''
-                }`
-              }
-              onClick={() =>
-                setAdminPage(
-                  'categories'
-                )
-              }
-            >
-              Inventario
-            </button>
+        <nav className="admin-nav">
+          <button
+            type="button"
+            className={
+              `nav-button ${
+                currentPage ===
+                'sales'
+                  ? 'nav-button-active'
+                  : ''
+              }`
+            }
+            onClick={() =>
+              setCurrentPage(
+                'sales'
+              )
+            }
+          >
+            Venta
+          </button>
 
-            <button
-              type="button"
-              className={
-                `nav-button ${
-                  adminPage ===
-                  'users'
-                    ? 'nav-button-active'
-                    : ''
-                }`
-              }
-              onClick={() =>
-                setAdminPage(
-                  'users'
-                )
-              }
-            >
-              Usuarios
-            </button>
-          </nav>
-        )}
+          {user.role ===
+            'ADMIN' && (
+            <>
+              <button
+                type="button"
+                className={
+                  `nav-button ${
+                    currentPage ===
+                    'categories'
+                      ? 'nav-button-active'
+                      : ''
+                  }`
+                }
+                onClick={() =>
+                  setCurrentPage(
+                    'categories'
+                  )
+                }
+              >
+                Inventario
+              </button>
+
+              <button
+                type="button"
+                className={
+                  `nav-button ${
+                    currentPage ===
+                    'users'
+                      ? 'nav-button-active'
+                      : ''
+                  }`
+                }
+                onClick={() =>
+                  setCurrentPage(
+                    'users'
+                  )
+                }
+              >
+                Usuarios
+              </button>
+            </>
+          )}
+        </nav>
 
         <div className="topbar-user">
           <span>
@@ -241,7 +277,8 @@ React.JSX.Element {
           </span>
 
           <span className="role-badge">
-            {user.role === 'ADMIN'
+            {user.role ===
+            'ADMIN'
               ? 'Administrador'
               : 'Empleado'}
           </span>
@@ -258,34 +295,30 @@ React.JSX.Element {
         </div>
       </header>
 
-      {user.role === 'ADMIN' ? (
-        adminPage ===
-        'categories' ? (
-          <CategoriesPage />
-        ) : (
-          <UsersPage
-            currentUserId={
-              user.id
-            }
+      {currentPage ===
+        'sales' && (
+        <SalesPage />
+      )}
 
-            onCurrentUserUpdated={
-              handleCurrentUserUpdated
-            }
-          />
-        )
-      ) : (
-        <main className="page">
-          <section className="card">
-            <h1>
-              Bienvenido
-            </h1>
+      {currentPage ===
+        'categories' &&
+        user.role ===
+          'ADMIN' && (
+        <CategoriesPage />
+      )}
 
-            <p>
-              El módulo de ventas
-              será agregado después.
-            </p>
-          </section>
-        </main>
+      {currentPage ===
+        'users' &&
+        user.role ===
+          'ADMIN' && (
+        <UsersPage
+          currentUserId={
+            user.id
+          }
+          onCurrentUserUpdated={
+            handleCurrentUserUpdated
+          }
+        />
       )}
     </div>
   )

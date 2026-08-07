@@ -13,6 +13,60 @@ export interface AuthUser {
   role: UserRole
 }
 
+export type PaymentMethod =
+  | 'CASH'
+  | 'CARD'
+  | 'SINPE'
+
+export interface CreateSaleItemInput {
+  categoryId: number
+  quantity: number
+}
+
+export interface CreateSaleInput {
+  paymentMethod: PaymentMethod
+
+  items:
+    CreateSaleItemInput[]
+}
+
+export interface SaleItem {
+  id: number
+  categoryId: number
+  categoryName: string
+  unitPrice: number
+  discountPercent: number
+  quantity: number
+  subtotal: number
+  discountTotal: number
+  total: number
+}
+
+export interface Sale {
+  id: number
+
+  status:
+    | 'COMPLETED'
+    | 'CANCELED'
+
+  paymentMethod:
+    PaymentMethod
+
+  subtotal: number
+  discountTotal: number
+  total: number
+
+  createdBy: number
+
+  createdByUsername:
+    string
+
+  createdAt: string
+
+  items:
+    SaleItem[]
+}
+
 export interface AuthStatus {
   setupRequired: boolean
   user: AuthUser | null
@@ -269,9 +323,20 @@ const posApi = {
       input
     )
   }
+},
+
+sales: {
+  create: (
+    input: CreateSaleInput
+  ): Promise<
+    IpcResult<Sale>
+  > => {
+    return ipcRenderer.invoke(
+      'sales:create',
+      input
+    )
+  }
 }
-
-
 
 }
 

@@ -54,6 +54,60 @@ export interface CategoryInput {
   discountPercent: number
 }
 
+export type PaymentMethod =
+  | 'CASH'
+  | 'CARD'
+  | 'SINPE'
+
+export interface CreateSaleItemInput {
+  categoryId: number
+  quantity: number
+}
+
+export interface CreateSaleInput {
+  paymentMethod: PaymentMethod
+
+  items:
+    CreateSaleItemInput[]
+}
+
+export interface SaleItem {
+  id: number
+  categoryId: number
+  categoryName: string
+  unitPrice: number
+  discountPercent: number
+  quantity: number
+  subtotal: number
+  discountTotal: number
+  total: number
+}
+
+export interface Sale {
+  id: number
+
+  status:
+    | 'COMPLETED'
+    | 'CANCELED'
+
+  paymentMethod:
+    PaymentMethod
+
+  subtotal: number
+  discountTotal: number
+  total: number
+
+  createdBy: number
+
+  createdByUsername:
+    string
+
+  createdAt: string
+
+  items:
+    SaleItem[]
+}
+
 export interface UpdateCategoryInput
   extends CategoryInput {
   id: number
@@ -200,6 +254,14 @@ export interface PosApi {
     input: UpdateUserInput
   ) => Promise<
     IpcResult<UserRecord>
+  >
+}
+
+sales: {
+  create: (
+    input: CreateSaleInput
+  ) => Promise<
+    IpcResult<Sale>
   >
 }
 }
