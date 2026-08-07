@@ -1,11 +1,16 @@
 import {
   app,
   BrowserWindow,
-  ipcMain,
-  shell
+  ipcMain
 } from 'electron'
 
-import { join } from 'node:path'
+import {
+  registerUsersIpc
+} from './ipc/users'
+
+import {
+  join
+} from 'node:path'
 
 import {
   electronApp,
@@ -13,77 +18,89 @@ import {
   optimizer
 } from '@electron-toolkit/utils'
 
-import icon from '../../resources/icon.png?asset'
+import icon
+  from '../../resources/icon.png?asset'
 
 import {
   closeDatabase,
   initializeDatabase
 } from './database/connection'
 
-import { registerCategoriesIpc } from './ipc/categories'
-import { registerDatabaseIpc } from './ipc/database'
+import {
+  registerAuthIpc
+} from './ipc/auth'
+
+import {
+  registerCategoriesIpc
+} from './ipc/categories'
+
+import {
+  registerDatabaseIpc
+} from './ipc/database'
+
+import {
+  registerInventoryIpc
+} from './ipc/inventory'
 
 function createWindow(): void {
-  const mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+  const mainWindow =
+    new BrowserWindow({
+      width: 1280,
+      height: 800,
 
-    minWidth: 1024,
-    minHeight: 700,
+      minWidth: 1024,
+      minHeight: 700,
 
-    show: false,
-    autoHideMenuBar: true,
+      show: false,
 
-    ...(process.platform === 'linux'
-      ? { icon }
-      : {}),
+      autoHideMenuBar: true,
 
-    webPreferences: {
-      preload: join(
-        __dirname,
-        '../preload/index.js'
-      ),
+      ...(process.platform === 'linux'
+        ? { icon }
+        : {}),
 
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
-  })
+      webPreferences: {
+        preload: join(
+          __dirname,
+          '../preload/index.js'
+        ),
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show()
-  })
-
-  mainWindow.webContents.setWindowOpenHandler(
-    ({ url }) => {
-      try {
-        const parsedUrl = new URL(url)
-
-        if (
-          parsedUrl.protocol === 'https:' ||
-          parsedUrl.protocol === 'http:'
-        ) {
-          void shell.openExternal(url)
-        }
-      } catch (error: unknown) {
-        console.error(
-          '[window] Invalid external URL:',
-          error
-        )
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true
       }
+    })
 
-      return {
-        action: 'deny'
-      }
+  mainWindow.once(
+    'ready-to-show',
+    () => {
+      mainWindow.show()
     }
   )
 
+  /*
+   * Nuestro POS no necesita abrir
+   * ventanas externas.
+   */
+  mainWindow.webContents
+    .setWindowOpenHandler(
+      () => {
+        return {
+          action: 'deny'
+        }
+      }
+    )
+
   if (
     is.dev &&
-    process.env['ELECTRON_RENDERER_URL']
+    process.env[
+      'ELECTRON_RENDERER_URL'
+    ]
   ) {
     void mainWindow.loadURL(
-      process.env['ELECTRON_RENDERER_URL']
+      process.env[
+        'ELECTRON_RENDERER_URL'
+      ]
     )
   } else {
     void mainWindow.loadFile(
@@ -95,16 +112,27 @@ function createWindow(): void {
   }
 }
 
-function registerAppIpc(): void {
-  ipcMain.removeHandler('app:get-info')
+function registerAppIpc():
+void {
+  ipcMain.removeHandler(
+    'app:get-info'
+  )
 
-  ipcMain.handle('app:get-info', () => {
-    return {
-      name: app.getName(),
-      version: app.getVersion(),
-      platform: process.platform
+  ipcMain.handle(
+    'app:get-info',
+    () => {
+      return {
+        name:
+          app.getName(),
+
+        version:
+          app.getVersion(),
+
+        platform:
+          process.platform
+      }
     }
-  })
+  )
 }
 
 app.whenReady().then(() => {
@@ -114,34 +142,55 @@ app.whenReady().then(() => {
 
   app.on(
     'browser-window-created',
+
     (_, window) => {
-      optimizer.watchWindowShortcuts(window)
+      optimizer.watchWindowShortcuts(
+        window
+      )
     }
   )
 
   initializeDatabase()
 
   registerAppIpc()
+  registerAuthIpc()
   registerDatabaseIpc()
   registerCategoriesIpc()
+  registerInventoryIpc()
+  registerUsersIpc()
+
+
 
   createWindow()
 
-  app.on('activate', () => {
-    if (
-      BrowserWindow.getAllWindows().length === 0
-    ) {
-      createWindow()
+  app.on(
+    'activate',
+    () => {
+      if (
+        BrowserWindow
+          .getAllWindows()
+          .length === 0
+      ) {
+        createWindow()
+      }
     }
-  })
+  )
 })
 
-app.on('before-quit', () => {
-  closeDatabase()
-})
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
+app.on(
+  'before-quit',
+  () => {
+    closeDatabase()
   }
-})
+)
+
+app.on(
+  'window-all-closed',
+  () => {
+    if (
+      process.platform !== 'darwin'
+    ) {
+      app.quit()
+    }
+  }
+)

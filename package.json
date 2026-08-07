@@ -23,6 +23,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3"
   },
   "devDependencies": {

@@ -1,3 +1,28 @@
+export type UserRole =
+  | 'ADMIN'
+  | 'EMPLOYEE'
+
+export interface AuthUser {
+  id: number
+  username: string
+  role: UserRole
+}
+
+export interface AuthStatus {
+  setupRequired: boolean
+  user: AuthUser | null
+}
+
+export interface SetupAdminInput {
+  username: string
+  password: string
+}
+
+export interface LoginInput {
+  username: string
+  password: string
+}
+
 export interface AppInfo {
   name: string
   version: string
@@ -34,6 +59,48 @@ export interface UpdateCategoryInput
   id: number
 }
 
+export interface InventoryMovement {
+  id: number
+  categoryId: number
+  categoryName: string
+
+  movementType:
+    | 'INITIAL_STOCK'
+    | 'MANUAL_ADDITION'
+    | 'MANUAL_REMOVAL'
+    | 'SALE'
+    | 'SALE_CANCELLATION'
+
+  quantityChange: number
+  stockBefore: number
+  stockAfter: number
+  note: string | null
+  createdAt: string
+}
+
+export interface UserRecord {
+  id: number
+  username: string
+  role: UserRole
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateUserInput {
+  username: string
+  password: string
+  role: UserRole
+}
+
+export interface UpdateUserInput {
+  id: number
+  username: string
+  password?: string
+  role: UserRole
+  active: boolean
+}
+
 export type IpcResult<T> =
   | {
       success: true
@@ -46,31 +113,95 @@ export type IpcResult<T> =
 
 export interface PosApi {
   app: {
-    getInfo: () => Promise<AppInfo>
+    getInfo:
+      () => Promise<AppInfo>
+  }
+
+  auth: {
+    getStatus:
+      () => Promise<
+        IpcResult<AuthStatus>
+      >
+
+    setup: (
+      input: SetupAdminInput
+    ) => Promise<
+      IpcResult<AuthUser>
+    >
+
+    login: (
+      input: LoginInput
+    ) => Promise<
+      IpcResult<AuthUser>
+    >
+
+    logout:
+      () => Promise<
+        IpcResult<null>
+      >
   }
 
   database: {
-    getStatus: () => Promise<DatabaseStatus>
+    getStatus:
+      () => Promise<
+        DatabaseStatus
+      >
   }
 
   categories: {
-    list: () => Promise<
-      IpcResult<Category[]>
-    >
+    list:
+      () => Promise<
+        IpcResult<Category[]>
+      >
 
     create: (
       input: CategoryInput
-    ) => Promise<IpcResult<Category>>
+    ) => Promise<
+      IpcResult<Category>
+    >
 
     update: (
       input: UpdateCategoryInput
-    ) => Promise<IpcResult<Category>>
+    ) => Promise<
+      IpcResult<Category>
+    >
 
     setActive: (
       id: number,
       active: boolean
-    ) => Promise<IpcResult<Category>>
+    ) => Promise<
+      IpcResult<Category>
+    >
   }
+
+  inventory: {
+    listRecent: (
+      limit?: number
+    ) => Promise<
+      IpcResult<
+        InventoryMovement[]
+      >
+    >
+  }
+
+  users: {
+  list:
+    () => Promise<
+      IpcResult<UserRecord[]>
+    >
+
+  create: (
+    input: CreateUserInput
+  ) => Promise<
+    IpcResult<UserRecord>
+  >
+
+  update: (
+    input: UpdateUserInput
+  ) => Promise<
+    IpcResult<UserRecord>
+  >
+}
 }
 
 declare global {

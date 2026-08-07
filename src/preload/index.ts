@@ -3,6 +3,31 @@ import {
   ipcRenderer
 } from 'electron'
 
+export type UserRole =
+  | 'ADMIN'
+  | 'EMPLOYEE'
+
+export interface AuthUser {
+  id: number
+  username: string
+  role: UserRole
+}
+
+export interface AuthStatus {
+  setupRequired: boolean
+  user: AuthUser | null
+}
+
+export interface SetupAdminInput {
+  username: string
+  password: string
+}
+
+export interface LoginInput {
+  username: string
+  password: string
+}
+
 export interface AppInfo {
   name: string
   version: string
@@ -21,8 +46,12 @@ export interface Category {
   name: string
   price: number
   stock: number
-  discountPercent: number
+
+  discountPercent:
+    number
+
   active: boolean
+
   createdAt: string
   updatedAt: string
 }
@@ -31,7 +60,9 @@ export interface CategoryInput {
   name: string
   price: number
   stock: number
-  discountPercent: number
+
+  discountPercent:
+    number
 }
 
 export interface UpdateCategoryInput
@@ -39,24 +70,105 @@ export interface UpdateCategoryInput
   id: number
 }
 
-export interface IpcResult<T> {
-  success: boolean
-  data?: T
-  message?: string
+export interface InventoryMovement {
+  id: number
+
+  categoryId:
+    number
+
+  categoryName:
+    string
+
+  movementType:
+    | 'INITIAL_STOCK'
+    | 'MANUAL_ADDITION'
+    | 'MANUAL_REMOVAL'
+    | 'SALE'
+    | 'SALE_CANCELLATION'
+
+  quantityChange:
+    number
+
+  stockBefore:
+    number
+
+  stockAfter:
+    number
+
+  note:
+    string | null
+
+  createdAt:
+    string
 }
+
+export type IpcResult<T> =
+  | {
+      success: true
+      data: T
+    }
+  | {
+      success: false
+      message: string
+    }
 
 const posApi = {
   app: {
-    getInfo: (): Promise<AppInfo> => {
+    getInfo:
+      (): Promise<AppInfo> => {
+        return ipcRenderer.invoke(
+          'app:get-info'
+        )
+      }
+  },
+
+  auth: {
+    getStatus:
+      (): Promise<
+        IpcResult<AuthStatus>
+      > => {
+        return ipcRenderer.invoke(
+          'auth:get-status'
+        )
+      },
+
+    setup: (
+      input: SetupAdminInput
+    ): Promise<
+      IpcResult<AuthUser>
+    > => {
       return ipcRenderer.invoke(
-        'app:get-info'
+        'auth:setup',
+        input
       )
-    }
+    },
+
+    login: (
+      input: LoginInput
+    ): Promise<
+      IpcResult<AuthUser>
+    > => {
+      return ipcRenderer.invoke(
+        'auth:login',
+        input
+      )
+    },
+
+    logout:
+      (): Promise<
+        IpcResult<null>
+      > => {
+        return ipcRenderer.invoke(
+          'auth:logout'
+        )
+      }
   },
 
   database: {
     getStatus:
-      (): Promise<DatabaseStatus> => {
+      (): Promise<
+        DatabaseStatus
+      > => {
         return ipcRenderer.invoke(
           'database:get-status'
         )
@@ -65,7 +177,9 @@ const posApi = {
 
   categories: {
     list:
-      (): Promise<IpcResult<Category[]>> => {
+      (): Promise<
+        IpcResult<Category[]>
+      > => {
         return ipcRenderer.invoke(
           'categories:list'
         )
@@ -73,7 +187,9 @@ const posApi = {
 
     create: (
       input: CategoryInput
-    ): Promise<IpcResult<Category>> => {
+    ): Promise<
+      IpcResult<Category>
+    > => {
       return ipcRenderer.invoke(
         'categories:create',
         input
@@ -82,7 +198,9 @@ const posApi = {
 
     update: (
       input: UpdateCategoryInput
-    ): Promise<IpcResult<Category>> => {
+    ): Promise<
+      IpcResult<Category>
+    > => {
       return ipcRenderer.invoke(
         'categories:update',
         input
@@ -92,7 +210,9 @@ const posApi = {
     setActive: (
       id: number,
       active: boolean
-    ): Promise<IpcResult<Category>> => {
+    ): Promise<
+      IpcResult<Category>
+    > => {
       return ipcRenderer.invoke(
         'categories:set-active',
         {
@@ -101,10 +221,87 @@ const posApi = {
         }
       )
     }
+  },
+
+  inventory: {
+    listRecent: (
+      limit = 50
+    ): Promise<
+      IpcResult<
+        InventoryMovement[]
+      >
+    > => {
+      return ipcRenderer.invoke(
+        'inventory:list-recent',
+        limit
+      )
+    }
+  },
+
+  users: {
+  list:
+    (): Promise<
+      IpcResult<UserRecord[]>
+    > => {
+      return ipcRenderer.invoke(
+        'users:list'
+      )
+    },
+
+  create: (
+    input: CreateUserInput
+  ): Promise<
+    IpcResult<UserRecord>
+  > => {
+    return ipcRenderer.invoke(
+      'users:create',
+      input
+    )
+  },
+
+  update: (
+    input: UpdateUserInput
+  ): Promise<
+    IpcResult<UserRecord>
+  > => {
+    return ipcRenderer.invoke(
+      'users:update',
+      input
+    )
   }
 }
+
+
+
+}
+
+
+
 
 contextBridge.exposeInMainWorld(
   'pos',
   posApi
 )
+
+export interface UserRecord {
+  id: number
+  username: string
+  role: UserRole
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateUserInput {
+  username: string
+  password: string
+  role: UserRole
+}
+
+export interface UpdateUserInput {
+  id: number
+  username: string
+  password?: string
+  role: UserRole
+  active: boolean
+}

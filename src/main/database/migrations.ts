@@ -6,13 +6,6 @@ interface Migration {
   sql: string
 }
 
-/*
- * Cada cambio futuro de la base de datos debe agregarse
- * como una migración nueva.
- *
- * No debes modificar una migración que ya haya sido
- * utilizada por una instalación real.
- */
 const migrations: Migration[] = [
   {
     version: 1,
@@ -80,16 +73,89 @@ const migrations: Migration[] = [
       INSERT INTO settings (id)
       VALUES (1);
     `
+  },
+
+  {
+    version: 2,
+    name: 'inventory_movements',
+    sql: `
+      CREATE TABLE inventory_movements (
+        id INTEGER PRIMARY KEY,
+
+        category_id INTEGER NOT NULL,
+
+        movement_type TEXT NOT NULL
+          CHECK (
+            movement_type IN (
+              'INITIAL_STOCK',
+              'MANUAL_ADDITION',
+              'MANUAL_REMOVAL',
+              'SALE',
+              'SALE_CANCELLATION'
+            )
+          ),
+
+        quantity_change INTEGER NOT NULL
+          CHECK (quantity_change != 0),
+
+        stock_before INTEGER NOT NULL
+          CHECK (stock_before >= 0),
+
+        stock_after INTEGER NOT NULL
+          CHECK (stock_after >= 0),
+
+        note TEXT,
+
+        user_id INTEGER,
+
+        created_at TEXT NOT NULL
+          DEFAULT CURRENT_TIMESTAMP,
+
+        FOREIGN KEY (category_id)
+          REFERENCES categories(id),
+
+        FOREIGN KEY (user_id)
+          REFERENCES users(id)
+          ON DELETE SET NULL
+      );
+
+      CREATE INDEX
+        idx_inventory_movements_category
+      ON inventory_movements(category_id);
+
+      CREATE INDEX
+        idx_inventory_movements_created_at
+      ON inventory_movements(created_at);
+
+      /*
+       * Si ya existían categorías antes de crear
+       * esta tabla, registramos su inventario actual
+       * como inventario inicial.
+       */
+      INSERT INTO inventory_movements (
+        category_id,
+        movement_type,
+        quantity_change,
+        stock_before,
+        stock_after,
+        note
+      )
+      SELECT
+        id,
+        'INITIAL_STOCK',
+        stock,
+        0,
+        stock,
+        'Inventario existente al habilitar el historial.'
+      FROM categories
+      WHERE stock > 0;
+    `
   }
 ]
 
 export function runMigrations(
   database: Database.Database
 ): void {
-  /*
-   * Esta tabla lleva el control de las migraciones
-   * que ya fueron ejecutadas.
-   */
   database.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,
@@ -110,35 +176,39 @@ export function runMigrations(
     appliedRows.map((row) => row.version)
   )
 
-  const saveMigrationStatement = database.prepare(`
-    INSERT INTO schema_migrations (
-      version,
-      name
-    )
-    VALUES (?, ?)
-  `)
-
-  /*
-   * El SQL de la migración y su registro se guardan
-   * dentro de la misma transacción.
-   */
-  const applyMigration = database.transaction(
-    (migration: Migration): void => {
-      database.exec(migration.sql)
-
-      saveMigrationStatement.run(
-        migration.version,
-        migration.name
+  const saveMigrationStatement =
+    database.prepare(`
+      INSERT INTO schema_migrations (
+        version,
+        name
       )
-    }
-  )
+      VALUES (?, ?)
+    `)
 
-  const orderedMigrations = [...migrations].sort(
-    (first, second) => first.version - second.version
-  )
+  const applyMigration =
+    database.transaction(
+      (migration: Migration): void => {
+        database.exec(migration.sql)
+
+        saveMigrationStatement.run(
+          migration.version,
+          migration.name
+        )
+      }
+    )
+
+  const orderedMigrations =
+    [...migrations].sort(
+      (first, second) =>
+        first.version - second.version
+    )
 
   for (const migration of orderedMigrations) {
-    if (appliedVersions.has(migration.version)) {
+    if (
+      appliedVersions.has(
+        migration.version
+      )
+    ) {
       continue
     }
 

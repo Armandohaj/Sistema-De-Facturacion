@@ -1,4 +1,11 @@
-import { ipcMain } from 'electron'
+import {
+  ipcMain
+} from 'electron'
+
+import {
+  requireAdmin,
+  requireUser
+} from '../auth/auth.service'
 
 import {
   createCategory,
@@ -9,7 +16,8 @@ import {
   type CategoryInput
 } from '../categories/category.service'
 
-interface UpdateCategoryInput extends CategoryInput {
+interface UpdateCategoryInput
+  extends CategoryInput {
   id: number
 }
 
@@ -32,18 +40,26 @@ type IpcResult<T> =
   | IpcSuccess<T>
   | IpcFailure
 
-function success<T>(data: T): IpcSuccess<T> {
+function success<T>(
+  data: T
+): IpcSuccess<T> {
   return {
     success: true,
     data
   }
 }
 
-function failure(error: unknown): IpcFailure {
-  console.error('[categories]', error)
+function failure(
+  error: unknown
+): IpcFailure {
+  console.error(
+    '[categories]',
+    error
+  )
 
   return {
     success: false,
+
     message:
       error instanceof Error
         ? error.message
@@ -51,32 +67,40 @@ function failure(error: unknown): IpcFailure {
   }
 }
 
-export function registerCategoriesIpc(): void {
-  ipcMain.removeHandler('categories:list')
-  ipcMain.removeHandler('categories:create')
-  ipcMain.removeHandler('categories:update')
-  ipcMain.removeHandler('categories:set-active')
-
-  ipcMain.handle(
-    'categories:list',
-    (): IpcResult<Category[]> => {
-      try {
-        return success(listCategories())
-      } catch (error: unknown) {
-        return failure(error)
-      }
-    }
+export function registerCategoriesIpc():
+void {
+  ipcMain.removeHandler(
+    'categories:list'
   )
 
+  ipcMain.removeHandler(
+    'categories:create'
+  )
+
+  ipcMain.removeHandler(
+    'categories:update'
+  )
+
+  ipcMain.removeHandler(
+    'categories:set-active'
+  )
+
+  /*
+   * Tanto ADMIN como EMPLOYEE podrán
+   * consultar categorías.
+   *
+   * Los empleados necesitarán esto
+   * posteriormente para realizar ventas.
+   */
   ipcMain.handle(
-    'categories:create',
-    (
-      _event,
-      input: CategoryInput
-    ): IpcResult<Category> => {
+    'categories:list',
+
+    (): IpcResult<Category[]> => {
       try {
+        requireUser()
+
         return success(
-          createCategory(input)
+          listCategories()
         )
       } catch (error: unknown) {
         return failure(error)
@@ -84,13 +108,46 @@ export function registerCategoriesIpc(): void {
     }
   )
 
+  /*
+   * Solo ADMIN puede crear.
+   */
+  ipcMain.handle(
+    'categories:create',
+
+    (
+      _event,
+      input: CategoryInput
+    ): IpcResult<Category> => {
+      try {
+        const user =
+          requireAdmin()
+
+        return success(
+          createCategory(
+            input,
+            user.id
+          )
+        )
+      } catch (error: unknown) {
+        return failure(error)
+      }
+    }
+  )
+
+  /*
+   * Solo ADMIN puede editar.
+   */
   ipcMain.handle(
     'categories:update',
+
     (
       _event,
       input: UpdateCategoryInput
     ): IpcResult<Category> => {
       try {
+        const user =
+          requireAdmin()
+
         return success(
           updateCategory(
             input.id,
@@ -100,7 +157,8 @@ export function registerCategoriesIpc(): void {
               stock: input.stock,
               discountPercent:
                 input.discountPercent
-            }
+            },
+            user.id
           )
         )
       } catch (error: unknown) {
@@ -109,13 +167,20 @@ export function registerCategoriesIpc(): void {
     }
   )
 
+  /*
+   * Solo ADMIN puede activar
+   * o desactivar.
+   */
   ipcMain.handle(
     'categories:set-active',
+
     (
       _event,
       input: SetCategoryActiveInput
     ): IpcResult<Category> => {
       try {
+        requireAdmin()
+
         return success(
           setCategoryActive(
             input.id,
