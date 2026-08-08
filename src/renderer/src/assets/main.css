@@ -883,3 +883,64 @@ select:focus {
 .cart-item-header small {
   color: #6b7280;
 }
+
+.sale-cancel-confirmation {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+}
+
+.sale-cancel-confirmation p {
+  margin: 8px 0 0;
+}
+
+.button-danger {
+  border: none;
+  background: #b91c1c;
+  color: #ffffff;
+}
+
+.button-danger:hover:not(:disabled) {
+  background: #991b1b;
+}
+
+.button-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sale-detail-info {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.sale-detail-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sale-detail-info-row span {
+  color: #6b7280;
+}
+
+.sale-cancellation-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  margin-top: 18px;
+  padding: 14px;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.sale-cancellation-info > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

@@ -18,6 +18,10 @@ export type PaymentMethod =
   | 'CARD'
   | 'SINPE'
 
+export type SaleStatus =
+  | 'COMPLETED'
+  | 'CANCELED'
+
 export interface CreateSaleItemInput {
   categoryId: number
   quantity: number
@@ -25,9 +29,7 @@ export interface CreateSaleItemInput {
 
 export interface CreateSaleInput {
   paymentMethod: PaymentMethod
-
-  items:
-    CreateSaleItemInput[]
+  items: CreateSaleItemInput[]
 }
 
 export interface SaleItem {
@@ -44,27 +46,40 @@ export interface SaleItem {
 
 export interface Sale {
   id: number
-
-  status:
-    | 'COMPLETED'
-    | 'CANCELED'
-
-  paymentMethod:
-    PaymentMethod
-
+  status: SaleStatus
+  paymentMethod: PaymentMethod
   subtotal: number
   discountTotal: number
   total: number
-
   createdBy: number
-
-  createdByUsername:
-    string
-
+  createdByUsername: string
   createdAt: string
+  items: SaleItem[]
+}
 
-  items:
-    SaleItem[]
+export interface SaleHistoryFilters {
+  saleId?: number
+  date?: string
+}
+
+export interface SaleHistoryItem {
+  id: number
+  status: SaleStatus
+  paymentMethod: PaymentMethod
+  subtotal: number
+  discountTotal: number
+  total: number
+  createdBy: number
+  createdByUsername: string
+  createdAt: string
+  canceledAt: string | null
+  canceledBy: number | null
+  canceledByUsername: string | null
+}
+
+export interface SaleDetail
+  extends SaleHistoryItem {
+  items: SaleItem[]
 }
 
 export interface AuthStatus {
@@ -100,12 +115,8 @@ export interface Category {
   name: string
   price: number
   stock: number
-
-  discountPercent:
-    number
-
+  discountPercent: number
   active: boolean
-
   createdAt: string
   updatedAt: string
 }
@@ -114,9 +125,7 @@ export interface CategoryInput {
   name: string
   price: number
   stock: number
-
-  discountPercent:
-    number
+  discountPercent: number
 }
 
 export interface UpdateCategoryInput
@@ -126,12 +135,8 @@ export interface UpdateCategoryInput
 
 export interface InventoryMovement {
   id: number
-
-  categoryId:
-    number
-
-  categoryName:
-    string
+  categoryId: number
+  categoryName: string
 
   movementType:
     | 'INITIAL_STOCK'
@@ -140,20 +145,34 @@ export interface InventoryMovement {
     | 'SALE'
     | 'SALE_CANCELLATION'
 
-  quantityChange:
-    number
+  quantityChange: number
+  stockBefore: number
+  stockAfter: number
+  note: string | null
+  createdAt: string
+}
 
-  stockBefore:
-    number
+export interface UserRecord {
+  id: number
+  username: string
+  role: UserRole
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
 
-  stockAfter:
-    number
+export interface CreateUserInput {
+  username: string
+  password: string
+  role: UserRole
+}
 
-  note:
-    string | null
-
-  createdAt:
-    string
+export interface UpdateUserInput {
+  id: number
+  username: string
+  password?: string
+  role: UserRole
+  active: boolean
 }
 
 export type IpcResult<T> =
@@ -168,23 +187,21 @@ export type IpcResult<T> =
 
 const posApi = {
   app: {
-    getInfo:
-      (): Promise<AppInfo> => {
-        return ipcRenderer.invoke(
-          'app:get-info'
-        )
-      }
+    getInfo: (): Promise<AppInfo> => {
+      return ipcRenderer.invoke(
+        'app:get-info'
+      )
+    }
   },
 
   auth: {
-    getStatus:
-      (): Promise<
-        IpcResult<AuthStatus>
-      > => {
-        return ipcRenderer.invoke(
-          'auth:get-status'
-        )
-      },
+    getStatus: (): Promise<
+      IpcResult<AuthStatus>
+    > => {
+      return ipcRenderer.invoke(
+        'auth:get-status'
+      )
+    },
 
     setup: (
       input: SetupAdminInput
@@ -208,36 +225,33 @@ const posApi = {
       )
     },
 
-    logout:
-      (): Promise<
-        IpcResult<null>
-      > => {
-        return ipcRenderer.invoke(
-          'auth:logout'
-        )
-      }
+    logout: (): Promise<
+      IpcResult<null>
+    > => {
+      return ipcRenderer.invoke(
+        'auth:logout'
+      )
+    }
   },
 
   database: {
-    getStatus:
-      (): Promise<
-        DatabaseStatus
-      > => {
-        return ipcRenderer.invoke(
-          'database:get-status'
-        )
-      }
+    getStatus: (): Promise<
+      DatabaseStatus
+    > => {
+      return ipcRenderer.invoke(
+        'database:get-status'
+      )
+    }
   },
 
   categories: {
-    list:
-      (): Promise<
-        IpcResult<Category[]>
-      > => {
-        return ipcRenderer.invoke(
-          'categories:list'
-        )
-      },
+    list: (): Promise<
+      IpcResult<Category[]>
+    > => {
+      return ipcRenderer.invoke(
+        'categories:list'
+      )
+    },
 
     create: (
       input: CategoryInput
@@ -293,8 +307,7 @@ const posApi = {
   },
 
   users: {
-  list:
-    (): Promise<
+    list: (): Promise<
       IpcResult<UserRecord[]>
     > => {
       return ipcRenderer.invoke(
@@ -302,71 +315,69 @@ const posApi = {
       )
     },
 
-  create: (
-    input: CreateUserInput
-  ): Promise<
-    IpcResult<UserRecord>
-  > => {
-    return ipcRenderer.invoke(
-      'users:create',
-      input
-    )
+    create: (
+      input: CreateUserInput
+    ): Promise<
+      IpcResult<UserRecord>
+    > => {
+      return ipcRenderer.invoke(
+        'users:create',
+        input
+      )
+    },
+
+    update: (
+      input: UpdateUserInput
+    ): Promise<
+      IpcResult<UserRecord>
+    > => {
+      return ipcRenderer.invoke(
+        'users:update',
+        input
+      )
+    }
   },
 
-  update: (
-    input: UpdateUserInput
-  ): Promise<
-    IpcResult<UserRecord>
-  > => {
-    return ipcRenderer.invoke(
-      'users:update',
-      input
-    )
-  }
-},
+  sales: {
+    create: (
+      input: CreateSaleInput
+    ): Promise<IpcResult<Sale>> => {
+      return ipcRenderer.invoke(
+        'sales:create',
+        input
+      )
+    },
 
-sales: {
-  create: (
-    input: CreateSaleInput
-  ): Promise<
-    IpcResult<Sale>
-  > => {
-    return ipcRenderer.invoke(
-      'sales:create',
-      input
-    )
+    listHistory: (
+      filters: SaleHistoryFilters = {}
+    ): Promise<IpcResult<SaleHistoryItem[]>> => {
+      return ipcRenderer.invoke(
+        'sales:list-history',
+        filters
+      )
+    },
+
+    getDetail: (
+      saleId: number
+    ): Promise<IpcResult<SaleDetail>> => {
+      return ipcRenderer.invoke(
+        'sales:get-detail',
+        saleId
+      )
+    },
+
+    cancel: (
+      saleId: number
+    ): Promise<IpcResult<SaleDetail>> => {
+      return ipcRenderer.invoke(
+        'sales:cancel',
+        saleId
+      )
+    }
   }
 }
-
-}
-
-
-
 
 contextBridge.exposeInMainWorld(
   'pos',
   posApi
 )
-
-export interface UserRecord {
-  id: number
-  username: string
-  role: UserRole
-  active: boolean
-  createdAt: string
-  updatedAt: string
-}
-
-export interface CreateUserInput {
-  username: string
-  password: string
-  role: UserRole
-}
-
-export interface UpdateUserInput {
-  id: number
-  username: string
-  password?: string
-  role: UserRole
-  active: boolean
-}

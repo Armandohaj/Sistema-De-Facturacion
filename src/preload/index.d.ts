@@ -1,6 +1,8 @@
-export type UserRole =
-  | 'ADMIN'
-  | 'EMPLOYEE'
+export type UserRole = 'ADMIN' | 'EMPLOYEE'
+
+export type PaymentMethod = 'CASH' | 'CARD' | 'SINPE'
+
+export type SaleStatus = 'COMPLETED' | 'CANCELED'
 
 export interface AuthUser {
   id: number
@@ -54,62 +56,7 @@ export interface CategoryInput {
   discountPercent: number
 }
 
-export type PaymentMethod =
-  | 'CASH'
-  | 'CARD'
-  | 'SINPE'
-
-export interface CreateSaleItemInput {
-  categoryId: number
-  quantity: number
-}
-
-export interface CreateSaleInput {
-  paymentMethod: PaymentMethod
-
-  items:
-    CreateSaleItemInput[]
-}
-
-export interface SaleItem {
-  id: number
-  categoryId: number
-  categoryName: string
-  unitPrice: number
-  discountPercent: number
-  quantity: number
-  subtotal: number
-  discountTotal: number
-  total: number
-}
-
-export interface Sale {
-  id: number
-
-  status:
-    | 'COMPLETED'
-    | 'CANCELED'
-
-  paymentMethod:
-    PaymentMethod
-
-  subtotal: number
-  discountTotal: number
-  total: number
-
-  createdBy: number
-
-  createdByUsername:
-    string
-
-  createdAt: string
-
-  items:
-    SaleItem[]
-}
-
-export interface UpdateCategoryInput
-  extends CategoryInput {
+export interface UpdateCategoryInput extends CategoryInput {
   id: number
 }
 
@@ -117,14 +64,12 @@ export interface InventoryMovement {
   id: number
   categoryId: number
   categoryName: string
-
   movementType:
     | 'INITIAL_STOCK'
     | 'MANUAL_ADDITION'
     | 'MANUAL_REMOVAL'
     | 'SALE'
     | 'SALE_CANCELLATION'
-
   quantityChange: number
   stockBefore: number
   stockAfter: number
@@ -155,6 +100,77 @@ export interface UpdateUserInput {
   active: boolean
 }
 
+export interface CreateSaleItemInput {
+  categoryId: number
+  quantity: number
+}
+
+export interface CreateSaleInput {
+  paymentMethod: PaymentMethod
+  items: CreateSaleItemInput[]
+}
+
+export interface SaleItem {
+  id: number
+  categoryId: number
+  categoryName: string
+  unitPrice: number
+  discountPercent: number
+  quantity: number
+  subtotal: number
+  discountTotal: number
+  total: number
+}
+
+export interface Sale {
+  id: number
+  status: SaleStatus
+  paymentMethod: PaymentMethod
+  subtotal: number
+  discountTotal: number
+  total: number
+  createdBy: number
+  createdByUsername: string
+  createdAt: string
+  items: SaleItem[]
+}
+
+export interface SaleHistoryFilters {
+  saleId?: number
+  date?: string
+}
+
+export interface SaleHistoryItem {
+  id: number
+  status: SaleStatus
+  paymentMethod: PaymentMethod
+  subtotal: number
+  discountTotal: number
+  total: number
+  createdBy: number
+  createdByUsername: string
+  createdAt: string
+  canceledAt: string | null
+  canceledBy: number | null
+  canceledByUsername: string | null
+}
+
+export interface SaleDetailItem {
+  id: number
+  categoryId: number
+  categoryName: string
+  unitPrice: number
+  discountPercent: number
+  quantity: number
+  subtotal: number
+  discountTotal: number
+  total: number
+}
+
+export interface SaleDetail extends SaleHistoryItem {
+  items: SaleDetailItem[]
+}
+
 export type IpcResult<T> =
   | {
       success: true
@@ -167,103 +183,79 @@ export type IpcResult<T> =
 
 export interface PosApi {
   app: {
-    getInfo:
-      () => Promise<AppInfo>
+    getInfo: () => Promise<AppInfo>
   }
 
   auth: {
-    getStatus:
-      () => Promise<
-        IpcResult<AuthStatus>
-      >
+    getStatus: () => Promise<IpcResult<AuthStatus>>
 
     setup: (
       input: SetupAdminInput
-    ) => Promise<
-      IpcResult<AuthUser>
-    >
+    ) => Promise<IpcResult<AuthUser>>
 
     login: (
       input: LoginInput
-    ) => Promise<
-      IpcResult<AuthUser>
-    >
+    ) => Promise<IpcResult<AuthUser>>
 
-    logout:
-      () => Promise<
-        IpcResult<null>
-      >
+    logout: () => Promise<IpcResult<null>>
   }
 
   database: {
-    getStatus:
-      () => Promise<
-        DatabaseStatus
-      >
+    getStatus: () => Promise<DatabaseStatus>
   }
 
   categories: {
-    list:
-      () => Promise<
-        IpcResult<Category[]>
-      >
+    list: () => Promise<IpcResult<Category[]>>
 
     create: (
       input: CategoryInput
-    ) => Promise<
-      IpcResult<Category>
-    >
+    ) => Promise<IpcResult<Category>>
 
     update: (
       input: UpdateCategoryInput
-    ) => Promise<
-      IpcResult<Category>
-    >
+    ) => Promise<IpcResult<Category>>
 
     setActive: (
       id: number,
       active: boolean
-    ) => Promise<
-      IpcResult<Category>
-    >
+    ) => Promise<IpcResult<Category>>
   }
 
   inventory: {
     listRecent: (
       limit?: number
-    ) => Promise<
-      IpcResult<
-        InventoryMovement[]
-      >
-    >
+    ) => Promise<IpcResult<InventoryMovement[]>>
   }
 
   users: {
-  list:
-    () => Promise<
-      IpcResult<UserRecord[]>
-    >
+    list: () => Promise<IpcResult<UserRecord[]>>
 
-  create: (
-    input: CreateUserInput
-  ) => Promise<
-    IpcResult<UserRecord>
-  >
+    create: (
+      input: CreateUserInput
+    ) => Promise<IpcResult<UserRecord>>
 
-  update: (
-    input: UpdateUserInput
-  ) => Promise<
-    IpcResult<UserRecord>
-  >
-}
+    update: (
+      input: UpdateUserInput
+    ) => Promise<IpcResult<UserRecord>>
+  }
 
-sales: {
-  create: (
-    input: CreateSaleInput
-  ) => Promise<
-    IpcResult<Sale>
-  >
-}
+  sales: {
+    create: (
+      input: CreateSaleInput
+    ) => Promise<IpcResult<Sale>>
+
+    listHistory: (
+      filters?: SaleHistoryFilters
+    ) => Promise<IpcResult<SaleHistoryItem[]>>
+
+    getDetail: (
+      saleId: number
+    ) => Promise<IpcResult<SaleDetail>>
+
+    cancel: (
+      saleId: number
+    ) => Promise<IpcResult<SaleDetail>>
+  }
 }
 
 declare global {

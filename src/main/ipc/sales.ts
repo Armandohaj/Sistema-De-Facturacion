@@ -1,76 +1,49 @@
-import {
-  ipcMain
-} from 'electron'
+import { ipcMain } from 'electron'
 
 import {
+  requireAdmin,
   requireUser
 } from '../auth/auth.service'
 
 import {
+  cancelSale
+} from '../sales/sale-cancellation.service'
+
+import {
+  getSaleDetail,
+  listSales,
+  type SaleHistoryFilters
+} from '../sales/sale-history.service'
+
+import {
   createSale,
-  type CreateSaleInput,
-  type Sale
+  type CreateSaleInput
 } from '../sales/sale.service'
 
-type IpcSuccess<T> = {
-  success: true
-  data: T
-}
-
-type IpcFailure = {
-  success: false
-  message: string
-}
-
-type IpcResult<T> =
-  | IpcSuccess<T>
-  | IpcFailure
-
-function success<T>(
-  data: T
-): IpcSuccess<T> {
-  return {
-    success: true,
-    data
-  }
-}
-
-function failure(
+function getErrorMessage(
   error: unknown
-): IpcFailure {
-  console.error(
-    '[sales]',
-    error
-  )
-
-  return {
-    success: false,
-
-    message:
-      error instanceof Error
-        ? error.message
-        : 'Ocurrió un error inesperado.'
+): string {
+  if (
+    error instanceof Error
+  ) {
+    return error.message
   }
+
+  return (
+    'Ocurrió un error inesperado.'
+  )
 }
 
 export function registerSalesIpc():
 void {
-  ipcMain.removeHandler(
-    'sales:create'
-  )
-
   ipcMain.handle(
     'sales:create',
 
     (
       _event,
       input: CreateSaleInput
-    ): IpcResult<Sale> => {
+    ) => {
       try {
-        /*
-         * Tanto ADMIN como EMPLOYEE
-         * pueden realizar ventas.
-         */
         const user =
           requireUser()
 
@@ -80,13 +53,142 @@ void {
             user.id
           )
 
-        return success(
-          sale
-        )
-      } catch (error: unknown) {
-        return failure(
+        return {
+          success: true as const,
+          data: sale
+        }
+      } catch (
+        error: unknown
+      ) {
+        console.error(
+          '[sales:create]',
           error
         )
+
+        return {
+          success: false as const,
+          message:
+            getErrorMessage(
+              error
+            )
+        }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'sales:list-history',
+
+    (
+      _event,
+      filters:
+        SaleHistoryFilters = {}
+    ) => {
+      try {
+        requireUser()
+
+        const sales =
+          listSales(
+            filters
+          )
+
+        return {
+          success: true as const,
+          data: sales
+        }
+      } catch (
+        error: unknown
+      ) {
+        console.error(
+          '[sales:list-history]',
+          error
+        )
+
+        return {
+          success: false as const,
+          message:
+            getErrorMessage(
+              error
+            )
+        }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'sales:get-detail',
+
+    (
+      _event,
+      saleId: number
+    ) => {
+      try {
+        requireUser()
+
+        const sale =
+          getSaleDetail(
+            saleId
+          )
+
+        return {
+          success: true as const,
+          data: sale
+        }
+      } catch (
+        error: unknown
+      ) {
+        console.error(
+          '[sales:get-detail]',
+          error
+        )
+
+        return {
+          success: false as const,
+          message:
+            getErrorMessage(
+              error
+            )
+        }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'sales:cancel',
+
+    (
+      _event,
+      saleId: number
+    ) => {
+      try {
+        const admin =
+          requireAdmin()
+
+        const sale =
+          cancelSale(
+            saleId,
+            admin.id
+          )
+
+        return {
+          success: true as const,
+          data: sale
+        }
+      } catch (
+        error: unknown
+      ) {
+        console.error(
+          '[sales:cancel]',
+          error
+        )
+
+        return {
+          success: false as const,
+          message:
+            getErrorMessage(
+              error
+            )
+        }
       }
     }
   )
