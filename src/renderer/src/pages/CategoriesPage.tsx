@@ -33,61 +33,57 @@ const emptyForm: CategoryForm = {
   discountPercent: '0'
 }
 
-const currencyFormatter =
-  new Intl.NumberFormat('es-CR', {
-    style: 'currency',
-    currency: 'CRC',
-    maximumFractionDigits: 0
-  })
+const currencyFormatter = new Intl.NumberFormat('es-CR', {
+  style: 'currency',
+  currency: 'CRC',
+  maximumFractionDigits: 0
+})
 
 function CategoriesPage(): React.JSX.Element {
-  const [categories, setCategories] =
-    useState<Category[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
 
-  const [form, setForm] =
-    useState<CategoryForm>(emptyForm)
+  const [form, setForm] = useState<CategoryForm>(emptyForm)
 
-  const [editingId, setEditingId] =
-    useState<number | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
 
-  const [loading, setLoading] =
-    useState(true)
+  const [loading, setLoading] = useState(true)
 
-  const [saving, setSaving] =
-    useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const [message, setMessage] =
-    useState<Message | null>(null)
+  const [changingStatus, setChangingStatus] = useState(false)
 
-  const loadCategories =
-    useCallback(async (): Promise<void> => {
-      setLoading(true)
+  const [message, setMessage] = useState<Message | null>(null)
 
-      try {
-        const result =
-          await window.pos.categories.list()
+  const [categoryToChangeStatus, setCategoryToChangeStatus] =
+    useState<Category | null>(null)
 
-        if (!result.success) {
-          setMessage({
-            type: 'error',
-            text: result.message
-          })
+  const loadCategories = useCallback(async (): Promise<void> => {
+    setLoading(true)
 
-          return
-        }
+    try {
+      const result = await window.pos.categories.list()
 
-        setCategories(result.data)
-      } catch (error: unknown) {
-        console.error(error)
-
+      if (!result.success) {
         setMessage({
           type: 'error',
-          text: 'No se pudieron cargar las categorías.'
+          text: result.message
         })
-      } finally {
-        setLoading(false)
+
+        return
       }
-    }, [])
+
+      setCategories(result.data)
+    } catch (error: unknown) {
+      console.error(error)
+
+      setMessage({
+        type: 'error',
+        text: 'No se pudieron cargar las categorías.'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     void loadCategories()
@@ -108,18 +104,14 @@ function CategoriesPage(): React.JSX.Element {
     setEditingId(null)
   }
 
-  function startEditing(
-    category: Category
-  ): void {
+  function startEditing(category: Category): void {
     setEditingId(category.id)
 
     setForm({
       name: category.name,
       price: String(category.price),
       stock: String(category.stock),
-      discountPercent: String(
-        category.discountPercent
-      )
+      discountPercent: String(category.discountPercent)
     })
 
     setMessage(null)
@@ -130,9 +122,7 @@ function CategoriesPage(): React.JSX.Element {
     fieldName: string
   ): number {
     if (value.trim() === '') {
-      throw new Error(
-        `Debe indicar ${fieldName}.`
-      )
+      throw new Error(`Debe indicar ${fieldName}.`)
     }
 
     const parsedValue = Number(value)
@@ -151,20 +141,27 @@ function CategoriesPage(): React.JSX.Element {
   ): Promise<void> {
     event.preventDefault()
 
+    if (saving) {
+      return
+    }
+
     setMessage(null)
     setSaving(true)
 
     try {
       const input = {
         name: form.name,
+
         price: parseInteger(
           form.price,
           'el precio'
         ),
+
         stock: parseInteger(
           form.stock,
           'la cantidad disponible'
         ),
+
         discountPercent: parseInteger(
           form.discountPercent,
           'el descuento'
@@ -173,9 +170,7 @@ function CategoriesPage(): React.JSX.Element {
 
       const result =
         editingId === null
-          ? await window.pos.categories.create(
-              input
-            )
+          ? await window.pos.categories.create(input)
           : await window.pos.categories.update({
               id: editingId,
               ...input
@@ -199,8 +194,11 @@ function CategoriesPage(): React.JSX.Element {
       })
 
       resetForm()
+
       await loadCategories()
     } catch (error: unknown) {
+      console.error(error)
+
       setMessage({
         type: 'error',
         text:
@@ -213,20 +211,36 @@ function CategoriesPage(): React.JSX.Element {
     }
   }
 
-  async function handleActiveChange(
+  function openStatusConfirmation(
     category: Category
-  ): Promise<void> {
-    const newStatus = !category.active
+  ): void {
+    setMessage(null)
 
-    if (
-      !newStatus &&
-      !window.confirm(
-        `¿Deseas desactivar "${category.name}"?`
-      )
-    ) {
+    setCategoryToChangeStatus(category)
+  }
+
+  function closeStatusConfirmation(): void {
+    if (changingStatus) {
       return
     }
 
+    setCategoryToChangeStatus(null)
+  }
+
+  async function confirmStatusChange(): Promise<void> {
+    if (!categoryToChangeStatus) {
+      return
+    }
+
+    if (changingStatus) {
+      return
+    }
+
+    const category = categoryToChangeStatus
+
+    const newStatus = !category.active
+
+    setChangingStatus(true)
     setMessage(null)
 
     try {
@@ -252,14 +266,23 @@ function CategoriesPage(): React.JSX.Element {
           : 'Categoría desactivada correctamente.'
       })
 
+      setCategoryToChangeStatus(null)
+
+      if (editingId === category.id) {
+        resetForm()
+      }
+
       await loadCategories()
     } catch (error: unknown) {
       console.error(error)
 
       setMessage({
         type: 'error',
-        text: 'No se pudo cambiar el estado de la categoría.'
+        text:
+          'No se pudo cambiar el estado de la categoría.'
       })
+    } finally {
+      setChangingStatus(false)
     }
   }
 
@@ -302,6 +325,8 @@ function CategoriesPage(): React.JSX.Element {
                 value={form.name}
                 maxLength={80}
                 placeholder="Ejemplo: Pantalón hombre"
+                autoComplete="off"
+                disabled={saving}
                 onChange={(event) =>
                   updateForm(
                     'name',
@@ -320,6 +345,7 @@ function CategoriesPage(): React.JSX.Element {
                 step="1"
                 value={form.price}
                 placeholder="6000"
+                disabled={saving}
                 onChange={(event) =>
                   updateForm(
                     'price',
@@ -337,6 +363,7 @@ function CategoriesPage(): React.JSX.Element {
                 min="0"
                 step="1"
                 value={form.stock}
+                disabled={saving}
                 onChange={(event) =>
                   updateForm(
                     'stock',
@@ -355,9 +382,8 @@ function CategoriesPage(): React.JSX.Element {
                   min="0"
                   max="100"
                   step="1"
-                  value={
-                    form.discountPercent
-                  }
+                  value={form.discountPercent}
+                  disabled={saving}
                   onChange={(event) =>
                     updateForm(
                       'discountPercent',
@@ -445,91 +471,157 @@ function CategoriesPage(): React.JSX.Element {
                 </thead>
 
                 <tbody>
-                  {categories.map(
-                    (category) => (
-                      <tr
-                        key={category.id}
-                        className={
-                          category.active
-                            ? ''
-                            : 'inactive-row'
-                        }
-                      >
-                        <td>
-                          <strong>
-                            {category.name}
-                          </strong>
-                        </td>
+                  {categories.map((category) => (
+                    <tr
+                      key={category.id}
+                      className={
+                        category.active
+                          ? ''
+                          : 'inactive-row'
+                      }
+                    >
+                      <td>
+                        <strong>
+                          {category.name}
+                        </strong>
+                      </td>
 
-                        <td>
-                          {currencyFormatter.format(
-                            category.price
-                          )}
-                        </td>
+                      <td>
+                        {currencyFormatter.format(
+                          category.price
+                        )}
+                      </td>
 
-                        <td>
-                          {category.stock}
-                        </td>
+                      <td>
+                        {category.stock}
+                      </td>
 
-                        <td>
-                          {
-                            category.discountPercent
-                          }
-                          %
-                        </td>
+                      <td>
+                        {category.discountPercent}%
+                      </td>
 
-                        <td>
-                          <span
-                            className={`status ${
-                              category.active
-                                ? 'status-active'
-                                : 'status-inactive'
-                            }`}
+                      <td>
+                        <span
+                          className={`status ${
+                            category.active
+                              ? 'status-active'
+                              : 'status-inactive'
+                          }`}
+                        >
+                          {category.active
+                            ? 'Activa'
+                            : 'Inactiva'}
+                        </span>
+                      </td>
+
+                      <td>
+                        <div className="row-actions">
+                          <button
+                            type="button"
+                            className="text-button"
+                            disabled={
+                              saving ||
+                              changingStatus
+                            }
+                            onClick={() =>
+                              startEditing(
+                                category
+                              )
+                            }
+                          >
+                            Editar
+                          </button>
+
+                          <button
+                            type="button"
+                            className="text-button"
+                            disabled={
+                              saving ||
+                              changingStatus
+                            }
+                            onClick={() =>
+                              openStatusConfirmation(
+                                category
+                              )
+                            }
                           >
                             {category.active
-                              ? 'Activa'
-                              : 'Inactiva'}
-                          </span>
-                        </td>
-
-                        <td>
-                          <div className="row-actions">
-                            <button
-                              type="button"
-                              className="text-button"
-                              onClick={() =>
-                                startEditing(
-                                  category
-                                )
-                              }
-                            >
-                              Editar
-                            </button>
-
-                            <button
-                              type="button"
-                              className="text-button"
-                              onClick={() =>
-                                void handleActiveChange(
-                                  category
-                                )
-                              }
-                            >
-                              {category.active
-                                ? 'Desactivar'
-                                : 'Activar'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  )}
+                              ? 'Desactivar'
+                              : 'Activar'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
         </article>
       </section>
+
+      {categoryToChangeStatus && (
+        <div className="modal-backdrop">
+          <section
+            className="confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="category-status-title"
+          >
+            <h2 id="category-status-title">
+              {categoryToChangeStatus.active
+                ? 'Desactivar categoría'
+                : 'Activar categoría'}
+            </h2>
+
+            <p>
+              ¿Deseas{' '}
+              {categoryToChangeStatus.active
+                ? 'desactivar'
+                : 'activar'}{' '}
+              <strong>
+                {categoryToChangeStatus.name}
+              </strong>
+              ?
+            </p>
+
+            {categoryToChangeStatus.active && (
+              <p>
+                La categoría dejará de aparecer
+                disponible para realizar ventas,
+                pero conservará su información
+                e historial.
+              </p>
+            )}
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                disabled={changingStatus}
+                onClick={closeStatusConfirmation}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className="button button-primary"
+                disabled={changingStatus}
+                onClick={() =>
+                  void confirmStatusChange()
+                }
+              >
+                {changingStatus
+                  ? 'Guardando...'
+                  : categoryToChangeStatus.active
+                    ? 'Desactivar'
+                    : 'Activar'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   )
 }
