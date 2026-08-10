@@ -944,3 +944,18 @@ select:focus {
   align-items: center;
   gap: 4px;
 }
+
+.inventory-readonly-layout {
+  grid-template-columns: 1fr;
+}
+
+.inventory-readonly-notice {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+
+  background: #f9fafb;
+  color: #4b5563;
+}

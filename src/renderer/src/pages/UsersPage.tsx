@@ -289,7 +289,7 @@ function UsersPage({
 
           <p>
             Administra las cuentas
-            que pueden ingresar al POS.
+            que pueden ingresar al sistema.
           </p>
         </div>
       </header>

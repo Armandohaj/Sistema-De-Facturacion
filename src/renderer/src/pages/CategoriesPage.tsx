@@ -26,6 +26,10 @@ interface Message {
   text: string
 }
 
+interface CategoriesPageProps {
+  isAdmin: boolean
+}
+
 const emptyForm: CategoryForm = {
   name: '',
   price: '',
@@ -33,57 +37,108 @@ const emptyForm: CategoryForm = {
   discountPercent: '0'
 }
 
-const currencyFormatter = new Intl.NumberFormat('es-CR', {
-  style: 'currency',
-  currency: 'CRC',
-  maximumFractionDigits: 0
-})
-
-function CategoriesPage(): React.JSX.Element {
-  const [categories, setCategories] = useState<Category[]>([])
-
-  const [form, setForm] = useState<CategoryForm>(emptyForm)
-
-  const [editingId, setEditingId] = useState<number | null>(null)
-
-  const [loading, setLoading] = useState(true)
-
-  const [saving, setSaving] = useState(false)
-
-  const [changingStatus, setChangingStatus] = useState(false)
-
-  const [message, setMessage] = useState<Message | null>(null)
-
-  const [categoryToChangeStatus, setCategoryToChangeStatus] =
-    useState<Category | null>(null)
-
-  const loadCategories = useCallback(async (): Promise<void> => {
-    setLoading(true)
-
-    try {
-      const result = await window.pos.categories.list()
-
-      if (!result.success) {
-        setMessage({
-          type: 'error',
-          text: result.message
-        })
-
-        return
-      }
-
-      setCategories(result.data)
-    } catch (error: unknown) {
-      console.error(error)
-
-      setMessage({
-        type: 'error',
-        text: 'No se pudieron cargar las categorías.'
-      })
-    } finally {
-      setLoading(false)
+const currencyFormatter =
+  new Intl.NumberFormat(
+    'es-CR',
+    {
+      style: 'currency',
+      currency: 'CRC',
+      maximumFractionDigits: 0
     }
-  }, [])
+  )
+
+function CategoriesPage({
+  isAdmin
+}: CategoriesPageProps):
+React.JSX.Element {
+  const [
+    categories,
+    setCategories
+  ] = useState<Category[]>([])
+
+  const [
+    form,
+    setForm
+  ] = useState<CategoryForm>(
+    emptyForm
+  )
+
+  const [
+    editingId,
+    setEditingId
+  ] = useState<number | null>(
+    null
+  )
+
+  const [
+    loading,
+    setLoading
+  ] = useState(true)
+
+  const [
+    saving,
+    setSaving
+  ] = useState(false)
+
+  const [
+    changingStatus,
+    setChangingStatus
+  ] = useState(false)
+
+  const [
+    message,
+    setMessage
+  ] = useState<Message | null>(
+    null
+  )
+
+  const [
+    categoryToChangeStatus,
+    setCategoryToChangeStatus
+  ] = useState<Category | null>(
+    null
+  )
+
+  const loadCategories =
+    useCallback(
+      async (): Promise<void> => {
+        setLoading(true)
+
+        try {
+          const result =
+            await window.pos.categories
+              .list()
+
+          if (!result.success) {
+            setMessage({
+              type: 'error',
+              text: result.message
+            })
+
+            return
+          }
+
+          setCategories(
+            result.data
+          )
+        } catch (
+          error: unknown
+        ) {
+          console.error(
+            error
+          )
+
+          setMessage({
+            type: 'error',
+            text:
+              'No se pudieron cargar las categorías.'
+          })
+        } finally {
+          setLoading(false)
+        }
+      },
+      []
+    )
 
   useEffect(() => {
     void loadCategories()
@@ -93,25 +148,53 @@ function CategoriesPage(): React.JSX.Element {
     field: keyof CategoryForm,
     value: string
   ): void {
-    setForm((currentForm) => ({
-      ...currentForm,
-      [field]: value
-    }))
+    setForm(
+      (currentForm) => ({
+        ...currentForm,
+        [field]: value
+      })
+    )
   }
 
   function resetForm(): void {
-    setForm(emptyForm)
-    setEditingId(null)
+    setForm(
+      emptyForm
+    )
+
+    setEditingId(
+      null
+    )
   }
 
-  function startEditing(category: Category): void {
-    setEditingId(category.id)
+  function startEditing(
+    category: Category
+  ): void {
+    if (!isAdmin) {
+      return
+    }
+
+    setEditingId(
+      category.id
+    )
 
     setForm({
-      name: category.name,
-      price: String(category.price),
-      stock: String(category.stock),
-      discountPercent: String(category.discountPercent)
+      name:
+        category.name,
+
+      price:
+        String(
+          category.price
+        ),
+
+      stock:
+        String(
+          category.stock
+        ),
+
+      discountPercent:
+        String(
+          category.discountPercent
+        )
     })
 
     setMessage(null)
@@ -121,13 +204,22 @@ function CategoriesPage(): React.JSX.Element {
     value: string,
     fieldName: string
   ): number {
-    if (value.trim() === '') {
-      throw new Error(`Debe indicar ${fieldName}.`)
+    if (
+      value.trim() === ''
+    ) {
+      throw new Error(
+        `Debe indicar ${fieldName}.`
+      )
     }
 
-    const parsedValue = Number(value)
+    const parsedValue =
+      Number(value)
 
-    if (!Number.isInteger(parsedValue)) {
+    if (
+      !Number.isInteger(
+        parsedValue
+      )
+    ) {
       throw new Error(
         `${fieldName} debe ser un número entero.`
       )
@@ -137,9 +229,20 @@ function CategoriesPage(): React.JSX.Element {
   }
 
   async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
+    event:
+      FormEvent<HTMLFormElement>
   ): Promise<void> {
     event.preventDefault()
+
+    if (!isAdmin) {
+      setMessage({
+        type: 'error',
+        text:
+          'Solo un administrador puede modificar el inventario.'
+      })
+
+      return
+    }
 
     if (saving) {
       return
@@ -150,36 +253,49 @@ function CategoriesPage(): React.JSX.Element {
 
     try {
       const input = {
-        name: form.name,
+        name:
+          form.name,
 
-        price: parseInteger(
-          form.price,
-          'el precio'
-        ),
+        price:
+          parseInteger(
+            form.price,
+            'el precio'
+          ),
 
-        stock: parseInteger(
-          form.stock,
-          'la cantidad disponible'
-        ),
+        stock:
+          parseInteger(
+            form.stock,
+            'la cantidad disponible'
+          ),
 
-        discountPercent: parseInteger(
-          form.discountPercent,
-          'el descuento'
-        )
+        discountPercent:
+          parseInteger(
+            form.discountPercent,
+            'el descuento'
+          )
       }
 
       const result =
         editingId === null
-          ? await window.pos.categories.create(input)
-          : await window.pos.categories.update({
-              id: editingId,
-              ...input
-            })
+          ? await window.pos
+              .categories
+              .create(
+                input
+              )
+          : await window.pos
+              .categories
+              .update({
+                id:
+                  editingId,
+
+                ...input
+              })
 
       if (!result.success) {
         setMessage({
           type: 'error',
-          text: result.message
+          text:
+            result.message
         })
 
         return
@@ -187,6 +303,7 @@ function CategoriesPage(): React.JSX.Element {
 
       setMessage({
         type: 'success',
+
         text:
           editingId === null
             ? 'Categoría creada correctamente.'
@@ -196,11 +313,16 @@ function CategoriesPage(): React.JSX.Element {
       resetForm()
 
       await loadCategories()
-    } catch (error: unknown) {
-      console.error(error)
+    } catch (
+      error: unknown
+    ) {
+      console.error(
+        error
+      )
 
       setMessage({
         type: 'error',
+
         text:
           error instanceof Error
             ? error.message
@@ -214,46 +336,70 @@ function CategoriesPage(): React.JSX.Element {
   function openStatusConfirmation(
     category: Category
   ): void {
+    if (!isAdmin) {
+      return
+    }
+
     setMessage(null)
 
-    setCategoryToChangeStatus(category)
+    setCategoryToChangeStatus(
+      category
+    )
   }
 
-  function closeStatusConfirmation(): void {
-    if (changingStatus) {
+  function closeStatusConfirmation():
+  void {
+    if (
+      changingStatus
+    ) {
       return
     }
 
-    setCategoryToChangeStatus(null)
+    setCategoryToChangeStatus(
+      null
+    )
   }
 
-  async function confirmStatusChange(): Promise<void> {
-    if (!categoryToChangeStatus) {
+  async function confirmStatusChange():
+  Promise<void> {
+    if (!isAdmin) {
       return
     }
 
-    if (changingStatus) {
+    if (
+      !categoryToChangeStatus
+    ) {
       return
     }
 
-    const category = categoryToChangeStatus
+    if (
+      changingStatus
+    ) {
+      return
+    }
 
-    const newStatus = !category.active
+    const category =
+      categoryToChangeStatus
+
+    const newStatus =
+      !category.active
 
     setChangingStatus(true)
     setMessage(null)
 
     try {
       const result =
-        await window.pos.categories.setActive(
-          category.id,
-          newStatus
-        )
+        await window.pos.categories
+          .setActive(
+            category.id,
+            newStatus
+          )
 
       if (!result.success) {
         setMessage({
           type: 'error',
-          text: result.message
+          text:
+            result.message
         })
 
         return
@@ -261,20 +407,31 @@ function CategoriesPage(): React.JSX.Element {
 
       setMessage({
         type: 'success',
-        text: newStatus
-          ? 'Categoría activada correctamente.'
-          : 'Categoría desactivada correctamente.'
+
+        text:
+          newStatus
+            ? 'Categoría activada correctamente.'
+            : 'Categoría desactivada correctamente.'
       })
 
-      setCategoryToChangeStatus(null)
+      setCategoryToChangeStatus(
+        null
+      )
 
-      if (editingId === category.id) {
+      if (
+        editingId ===
+        category.id
+      ) {
         resetForm()
       }
 
       await loadCategories()
-    } catch (error: unknown) {
-      console.error(error)
+    } catch (
+      error: unknown
+    ) {
+      console.error(
+        error
+      )
 
       setMessage({
         type: 'error',
@@ -282,7 +439,9 @@ function CategoriesPage(): React.JSX.Element {
           'No se pudo cambiar el estado de la categoría.'
       })
     } finally {
-      setChangingStatus(false)
+      setChangingStatus(
+        false
+      )
     }
   }
 
@@ -290,143 +449,198 @@ function CategoriesPage(): React.JSX.Element {
     <main className="page">
       <header className="page-header">
         <div>
-          <h1>Categorías e inventario</h1>
+          <h1>
+            Categorías e inventario
+          </h1>
 
           <p>
-            Administra los productos que pueden
-            venderse en el sistema.
+            {isAdmin
+              ? 'Administra los productos que pueden venderse en el sistema.'
+              : 'Consulta las categorías, precios y existencias disponibles.'}
           </p>
         </div>
       </header>
 
       {message && (
         <div
-          className={`message message-${message.type}`}
+          className={
+            `message message-${message.type}`
+          }
           role="alert"
         >
           {message.text}
         </div>
       )}
 
-      <section className="layout">
-        <article className="card form-card">
-          <h2>
-            {editingId === null
-              ? 'Nueva categoría'
-              : 'Editar categoría'}
-          </h2>
+      <section
+        className={
+          isAdmin
+            ? 'layout'
+            : 'layout inventory-readonly-layout'
+        }
+      >
+        {isAdmin && (
+          <article className="card form-card">
+            <h2>
+              {editingId === null
+                ? 'Nueva categoría'
+                : 'Editar categoría'}
+            </h2>
 
-          <form onSubmit={handleSubmit}>
-            <label>
-              Nombre
+            <form
+              onSubmit={
+                handleSubmit
+              }
+            >
+              <label>
+                Nombre
 
-              <input
-                type="text"
-                value={form.name}
-                maxLength={80}
-                placeholder="Ejemplo: Pantalón hombre"
-                autoComplete="off"
-                disabled={saving}
-                onChange={(event) =>
-                  updateForm(
-                    'name',
-                    event.target.value
-                  )
-                }
-              />
-            </label>
+                <input
+                  type="text"
+                  value={
+                    form.name
+                  }
+                  maxLength={80}
+                  placeholder=
+                    "Ejemplo: Pantalón hombre"
+                  autoComplete="off"
+                  disabled={
+                    saving
+                  }
+                  onChange={
+                    (event) =>
+                      updateForm(
+                        'name',
+                        event.target
+                          .value
+                      )
+                  }
+                />
+              </label>
 
-            <label>
-              Precio en colones
+              <label>
+                Precio en colones
 
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={form.price}
-                placeholder="6000"
-                disabled={saving}
-                onChange={(event) =>
-                  updateForm(
-                    'price',
-                    event.target.value
-                  )
-                }
-              />
-            </label>
-
-            <label>
-              Cantidad disponible
-
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={form.stock}
-                disabled={saving}
-                onChange={(event) =>
-                  updateForm(
-                    'stock',
-                    event.target.value
-                  )
-                }
-              />
-            </label>
-
-            <label>
-              Descuento
-
-              <div className="input-suffix">
                 <input
                   type="number"
                   min="0"
-                  max="100"
                   step="1"
-                  value={form.discountPercent}
-                  disabled={saving}
-                  onChange={(event) =>
-                    updateForm(
-                      'discountPercent',
-                      event.target.value
-                    )
+                  value={
+                    form.price
+                  }
+                  placeholder="6000"
+                  disabled={
+                    saving
+                  }
+                  onChange={
+                    (event) =>
+                      updateForm(
+                        'price',
+                        event.target
+                          .value
+                      )
                   }
                 />
+              </label>
 
-                <span>%</span>
-              </div>
-            </label>
+              <label>
+                Cantidad disponible
 
-            <div className="form-actions">
-              <button
-                type="submit"
-                className="button button-primary"
-                disabled={saving}
-              >
-                {saving
-                  ? 'Guardando...'
-                  : editingId === null
-                    ? 'Crear categoría'
-                    : 'Guardar cambios'}
-              </button>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={
+                    form.stock
+                  }
+                  disabled={
+                    saving
+                  }
+                  onChange={
+                    (event) =>
+                      updateForm(
+                        'stock',
+                        event.target
+                          .value
+                      )
+                  }
+                />
+              </label>
 
-              {editingId !== null && (
+              <label>
+                Descuento
+
+                <div className="input-suffix">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={
+                      form.discountPercent
+                    }
+                    disabled={
+                      saving
+                    }
+                    onChange={
+                      (event) =>
+                        updateForm(
+                          'discountPercent',
+                          event.target
+                            .value
+                        )
+                    }
+                  />
+
+                  <span>
+                    %
+                  </span>
+                </div>
+              </label>
+
+              <div className="form-actions">
                 <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={resetForm}
-                  disabled={saving}
+                  type="submit"
+                  className=
+                    "button button-primary"
+                  disabled={
+                    saving
+                  }
                 >
-                  Cancelar
+                  {saving
+                    ? 'Guardando...'
+                    : editingId === null
+                      ? 'Crear categoría'
+                      : 'Guardar cambios'}
                 </button>
-              )}
-            </div>
-          </form>
-        </article>
+
+                {editingId !==
+                  null && (
+                  <button
+                    type="button"
+                    className=
+                      "button button-secondary"
+                    onClick={
+                      resetForm
+                    }
+                    disabled={
+                      saving
+                    }
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </form>
+          </article>
+        )}
 
         <article className="card list-card">
           <div className="card-header">
             <div>
-              <h2>Categorías registradas</h2>
+              <h2>
+                Categorías registradas
+              </h2>
 
               <p>
                 {categories.length}{' '}
@@ -438,21 +652,33 @@ function CategoriesPage(): React.JSX.Element {
 
             <button
               type="button"
-              className="button button-secondary"
+              className=
+                "button button-secondary"
               onClick={() =>
                 void loadCategories()
               }
-              disabled={loading}
+              disabled={
+                loading
+              }
             >
               Actualizar
             </button>
           </div>
 
+          {!isAdmin && (
+            <div className="inventory-readonly-notice">
+              Modo de consulta: puedes ver el
+              inventario, pero solo un administrador
+              puede modificarlo.
+            </div>
+          )}
+
           {loading ? (
             <p className="empty-state">
               Cargando categorías...
             </p>
-          ) : categories.length === 0 ? (
+          ) : categories.length ===
+            0 ? (
             <p className="empty-state">
               Todavía no hay categorías registradas.
             </p>
@@ -461,98 +687,140 @@ function CategoriesPage(): React.JSX.Element {
               <table>
                 <thead>
                   <tr>
-                    <th>Nombre</th>
-                    <th>Precio</th>
-                    <th>Existencias</th>
-                    <th>Descuento</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
+                    <th>
+                      Nombre
+                    </th>
+
+                    <th>
+                      Precio
+                    </th>
+
+                    <th>
+                      Existencias
+                    </th>
+
+                    <th>
+                      Descuento
+                    </th>
+
+                    <th>
+                      Estado
+                    </th>
+
+                    {isAdmin && (
+                      <th>
+                        Acciones
+                      </th>
+                    )}
                   </tr>
                 </thead>
 
                 <tbody>
-                  {categories.map((category) => (
-                    <tr
-                      key={category.id}
-                      className={
-                        category.active
-                          ? ''
-                          : 'inactive-row'
-                      }
-                    >
-                      <td>
-                        <strong>
-                          {category.name}
-                        </strong>
-                      </td>
+                  {categories.map(
+                    (
+                      category
+                    ) => (
+                      <tr
+                        key={
+                          category.id
+                        }
+                        className={
+                          category.active
+                            ? ''
+                            : 'inactive-row'
+                        }
+                      >
+                        <td>
+                          <strong>
+                            {
+                              category.name
+                            }
+                          </strong>
+                        </td>
 
-                      <td>
-                        {currencyFormatter.format(
-                          category.price
+                        <td>
+                          {currencyFormatter.format(
+                            category.price
+                          )}
+                        </td>
+
+                        <td>
+                          {
+                            category.stock
+                          }
+                        </td>
+
+                        <td>
+                          {
+                            category.discountPercent
+                          }
+                          %
+                        </td>
+
+                        <td>
+                          <span
+                            className={
+                              `status ${
+                                category.active
+                                  ? 'status-active'
+                                  : 'status-inactive'
+                              }`
+                            }
+                          >
+                            {
+                              category.active
+                                ? 'Activa'
+                                : 'Inactiva'
+                            }
+                          </span>
+                        </td>
+
+                        {isAdmin && (
+                          <td>
+                            <div className="row-actions">
+                              <button
+                                type="button"
+                                className=
+                                  "text-button"
+                                disabled={
+                                  saving ||
+                                  changingStatus
+                                }
+                                onClick={() =>
+                                  startEditing(
+                                    category
+                                  )
+                                }
+                              >
+                                Editar
+                              </button>
+
+                              <button
+                                type="button"
+                                className=
+                                  "text-button"
+                                disabled={
+                                  saving ||
+                                  changingStatus
+                                }
+                                onClick={() =>
+                                  openStatusConfirmation(
+                                    category
+                                  )
+                                }
+                              >
+                                {
+                                  category.active
+                                    ? 'Desactivar'
+                                    : 'Activar'
+                                }
+                              </button>
+                            </div>
+                          </td>
                         )}
-                      </td>
-
-                      <td>
-                        {category.stock}
-                      </td>
-
-                      <td>
-                        {category.discountPercent}%
-                      </td>
-
-                      <td>
-                        <span
-                          className={`status ${
-                            category.active
-                              ? 'status-active'
-                              : 'status-inactive'
-                          }`}
-                        >
-                          {category.active
-                            ? 'Activa'
-                            : 'Inactiva'}
-                        </span>
-                      </td>
-
-                      <td>
-                        <div className="row-actions">
-                          <button
-                            type="button"
-                            className="text-button"
-                            disabled={
-                              saving ||
-                              changingStatus
-                            }
-                            onClick={() =>
-                              startEditing(
-                                category
-                              )
-                            }
-                          >
-                            Editar
-                          </button>
-
-                          <button
-                            type="button"
-                            className="text-button"
-                            disabled={
-                              saving ||
-                              changingStatus
-                            }
-                            onClick={() =>
-                              openStatusConfirmation(
-                                category
-                              )
-                            }
-                          >
-                            {category.active
-                              ? 'Desactivar'
-                              : 'Activar'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>
@@ -560,15 +828,20 @@ function CategoriesPage(): React.JSX.Element {
         </article>
       </section>
 
-      {categoryToChangeStatus && (
+      {isAdmin &&
+        categoryToChangeStatus && (
         <div className="modal-backdrop">
           <section
             className="confirm-modal"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="category-status-title"
+            aria-labelledby=
+              "category-status-title"
           >
-            <h2 id="category-status-title">
+            <h2
+              id=
+                "category-status-title"
+            >
               {categoryToChangeStatus.active
                 ? 'Desactivar categoría'
                 : 'Activar categoría'}
@@ -580,7 +853,9 @@ function CategoriesPage(): React.JSX.Element {
                 ? 'desactivar'
                 : 'activar'}{' '}
               <strong>
-                {categoryToChangeStatus.name}
+                {
+                  categoryToChangeStatus.name
+                }
               </strong>
               ?
             </p>
@@ -597,17 +872,25 @@ function CategoriesPage(): React.JSX.Element {
             <div className="modal-actions">
               <button
                 type="button"
-                className="button button-secondary"
-                disabled={changingStatus}
-                onClick={closeStatusConfirmation}
+                className=
+                  "button button-secondary"
+                disabled={
+                  changingStatus
+                }
+                onClick={
+                  closeStatusConfirmation
+                }
               >
                 Cancelar
               </button>
 
               <button
                 type="button"
-                className="button button-primary"
-                disabled={changingStatus}
+                className=
+                  "button button-primary"
+                disabled={
+                  changingStatus
+                }
                 onClick={() =>
                   void confirmStatusChange()
                 }

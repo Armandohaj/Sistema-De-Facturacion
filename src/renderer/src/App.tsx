@@ -24,6 +24,7 @@ import UsersPage
 interface AuthUser {
   id: number
   username: string
+
   role:
     | 'ADMIN'
     | 'EMPLOYEE'
@@ -196,12 +197,15 @@ function App(): React.JSX.Element {
   const user =
     authStatus.user
 
+  const isAdmin =
+    user.role === 'ADMIN'
+
   return (
     <div className="app-shell">
       <header className="topbar">
         <div>
           <h1>
-            Sistema POS
+            Tienda De Ropa La Vega
           </h1>
 
           <nav className="admin-nav">
@@ -243,47 +247,44 @@ function App(): React.JSX.Element {
               Historial
             </button>
 
-            {user.role ===
-              'ADMIN' && (
-              <>
-                <button
-                  type="button"
-                  className={
-                    `nav-button ${
-                      currentPage ===
-                      'categories'
-                        ? 'nav-button-active'
-                        : ''
-                    }`
-                  }
-                  onClick={() =>
-                    setCurrentPage(
-                      'categories'
-                    )
-                  }
-                >
-                  Inventario
-                </button>
+            <button
+              type="button"
+              className={
+                `nav-button ${
+                  currentPage ===
+                  'categories'
+                    ? 'nav-button-active'
+                    : ''
+                }`
+              }
+              onClick={() =>
+                setCurrentPage(
+                  'categories'
+                )
+              }
+            >
+              Inventario
+            </button>
 
-                <button
-                  type="button"
-                  className={
-                    `nav-button ${
-                      currentPage ===
-                      'users'
-                        ? 'nav-button-active'
-                        : ''
-                    }`
-                  }
-                  onClick={() =>
-                    setCurrentPage(
-                      'users'
-                    )
-                  }
-                >
-                  Usuarios
-                </button>
-              </>
+            {isAdmin && (
+              <button
+                type="button"
+                className={
+                  `nav-button ${
+                    currentPage ===
+                    'users'
+                      ? 'nav-button-active'
+                      : ''
+                  }`
+                }
+                onClick={() =>
+                  setCurrentPage(
+                    'users'
+                  )
+                }
+              >
+                Usuarios
+              </button>
             )}
           </nav>
         </div>
@@ -294,8 +295,7 @@ function App(): React.JSX.Element {
           </span>
 
           <span className="role-badge">
-            {user.role ===
-            'ADMIN'
+            {isAdmin
               ? 'Administrador'
               : 'Empleado'}
           </span>
@@ -320,23 +320,20 @@ function App(): React.JSX.Element {
       {currentPage ===
         'history' && (
         <SalesHistoryPage
-          isAdmin={
-            user.role === 'ADMIN'
-          }
+          isAdmin={isAdmin}
         />
       )}
 
       {currentPage ===
-        'categories' &&
-        user.role ===
-          'ADMIN' && (
-        <CategoriesPage />
+        'categories' && (
+        <CategoriesPage
+          isAdmin={isAdmin}
+        />
       )}
 
       {currentPage ===
         'users' &&
-        user.role ===
-          'ADMIN' && (
+        isAdmin && (
         <UsersPage
           currentUserId={
             user.id

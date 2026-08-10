@@ -73,7 +73,7 @@ function LoginPage({
     <main className="auth-page">
       <section className="auth-card">
         <div className="auth-heading">
-          <h1>Sistema POS</h1>
+          <h1>Tienda De Ropa La Vega</h1>
 
           <p>
             Ingresa con tu usuario
