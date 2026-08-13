@@ -304,7 +304,62 @@ const migrations: Migration[] = [
         idx_inventory_movements_sale
       ON inventory_movements(sale_id);
     `
+  },
+
+  {
+  version: 4,
+  name: 'cash_closings',
+  sql: `
+    CREATE TABLE cash_closings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+      business_date TEXT NOT NULL UNIQUE,
+
+      completed_sales_count INTEGER NOT NULL
+        CHECK (completed_sales_count >= 0),
+
+      canceled_sales_count INTEGER NOT NULL
+        CHECK (canceled_sales_count >= 0),
+
+      sales_total INTEGER NOT NULL
+        CHECK (sales_total >= 0),
+
+      cash_sales INTEGER NOT NULL
+        CHECK (cash_sales >= 0),
+
+      card_sales INTEGER NOT NULL
+        CHECK (card_sales >= 0),
+
+      sinpe_sales INTEGER NOT NULL
+        CHECK (sinpe_sales >= 0),
+
+      opening_cash INTEGER NOT NULL
+        DEFAULT 0
+        CHECK (opening_cash >= 0),
+
+      expected_cash INTEGER NOT NULL
+        CHECK (expected_cash >= 0),
+
+      counted_cash INTEGER NOT NULL
+        CHECK (counted_cash >= 0),
+
+      cash_difference INTEGER NOT NULL,
+
+      closed_by INTEGER NOT NULL,
+
+      closed_at TEXT NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
+
+      FOREIGN KEY (closed_by)
+        REFERENCES users(id)
+        ON DELETE RESTRICT
+    );
+
+    CREATE INDEX idx_cash_closings_closed_at
+      ON cash_closings(closed_at);
+  `
   }
+
 ]
 
 export function runMigrations(

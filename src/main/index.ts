@@ -46,6 +46,14 @@ import {
   registerInventoryIpc
 } from './ipc/inventory'
 
+import {
+  registerReportsIpc
+} from './ipc/reports'
+
+import {
+  registerCashClosingIpc
+} from './ipc/cash-closing'
+
 function createWindow(): void {
   const mainWindow =
     new BrowserWindow({
@@ -163,7 +171,8 @@ app.whenReady().then(() => {
   registerInventoryIpc()
   registerUsersIpc()
   registerSalesIpc()
-
+  registerReportsIpc()
+  registerCashClosingIpc()
 
   createWindow()
 

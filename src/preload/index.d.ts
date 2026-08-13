@@ -171,6 +171,120 @@ export interface SaleDetail extends SaleHistoryItem {
   items: SaleDetailItem[]
 }
 
+
+export interface SalesPeriodSummary {
+  salesCount: number
+  total: number
+}
+
+export interface ProductSalesSummary {
+  categoryId: number
+  categoryName: string
+  quantity: number
+  total: number
+}
+
+export interface PaymentMethodSummary {
+  cash: number
+  card: number
+  sinpe: number
+}
+
+export interface DailySalesPoint {
+  date: string
+  salesCount: number
+  total: number
+}
+
+export interface MonthlySalesPoint {
+  month: string
+  salesCount: number
+  total: number
+}
+
+export interface ReportSummary {
+  today: SalesPeriodSummary
+  currentMonth: SalesPeriodSummary
+  paymentMethods: PaymentMethodSummary
+  mostSold: ProductSalesSummary | null
+  leastSold: ProductSalesSummary | null
+  dailyFlow: DailySalesPoint[]
+  monthlyHistory: MonthlySalesPoint[]
+}
+
+
+export interface MonthlyReport {
+  month: string
+  completedSalesCount: number
+  canceledSalesCount: number
+  total: number
+  paymentMethods: PaymentMethodSummary
+  mostSold: ProductSalesSummary | null
+  leastSold: ProductSalesSummary | null
+  dailyFlow: DailySalesPoint[]
+}
+
+export interface CashClosingPaymentSummary {
+  cash: number
+  card: number
+  sinpe: number
+}
+
+export interface DailyProductSummary {
+  categoryId: number
+  categoryName: string
+  quantity: number
+  total: number
+}
+
+export interface DailyClosingSummary {
+  date: string
+
+  completedSalesCount: number
+  canceledSalesCount: number
+
+  total: number
+
+  paymentMethods: CashClosingPaymentSummary
+
+  mostSold: DailyProductSummary | null
+  leastSold: DailyProductSummary | null
+}
+
+export interface CashClosing {
+  id: number
+  businessDate: string
+
+  completedSalesCount: number
+  canceledSalesCount: number
+
+  salesTotal: number
+
+  cashSales: number
+  cardSales: number
+  sinpeSales: number
+
+  openingCash: number
+  expectedCash: number
+  countedCash: number
+  cashDifference: number
+
+  closedBy: number
+  closedByUsername: string
+  closedAt: string
+}
+
+export interface CashClosingDay {
+  summary: DailyClosingSummary
+  closing: CashClosing | null
+}
+
+export interface CreateCashClosingInput {
+  date: string
+  openingCash: number
+  countedCash: number
+}
+
 export type IpcResult<T> =
   | {
       success: true
@@ -256,6 +370,33 @@ export interface PosApi {
       saleId: number
     ) => Promise<IpcResult<SaleDetail>>
   }
+
+  reports: {
+  getSummary: () => Promise<
+    IpcResult<ReportSummary>
+  >
+
+  getMonthlyReport: (
+    month: string
+  ) => Promise<
+    IpcResult<MonthlyReport>
+  >
+}
+
+cashClosing: {
+  getDay: (
+    date: string
+  ) => Promise<
+    IpcResult<CashClosingDay>
+  >
+
+  create: (
+    input: CreateCashClosingInput
+  ) => Promise<
+    IpcResult<CashClosing>
+  >
+}
+
 }
 
 declare global {

@@ -1,13 +1,22 @@
-import { getDatabase } from '../database/connection'
+import {
+  getDatabase
+} from '../database/connection'
 
 import {
   getSaleDetail,
   type SaleDetail
 } from './sale-history.service'
 
+import {
+  assertSaleBusinessDayOpen
+} from '../cash-closing/cash-closing.service'
+
 interface SaleRow {
   id: number
-  status: 'COMPLETED' | 'CANCELED'
+
+  status:
+    | 'COMPLETED'
+    | 'CANCELED'
 }
 
 interface SaleItemRow {
@@ -24,7 +33,9 @@ function validatePositiveInteger(
   fieldName: string
 ): void {
   if (
-    !Number.isInteger(value) ||
+    !Number.isInteger(
+      value
+    ) ||
     value <= 0
   ) {
     throw new Error(
@@ -53,6 +64,10 @@ export function cancelSale(
   const cancelTransaction =
     database.transaction(
       (): void => {
+        /*
+         * Primero obtenemos la venta
+         * dentro de la misma transacción.
+         */
         const sale =
           database
             .prepare(
@@ -63,7 +78,10 @@ export function cancelSale(
 
                 FROM sales
 
-                WHERE id = ?
+                WHERE
+                  id = ?
+
+                LIMIT 1
               `
             )
             .get(
@@ -79,14 +97,35 @@ export function cancelSale(
         }
 
         if (
-          sale.status ===
-          'CANCELED'
+          sale.status !==
+          'COMPLETED'
         ) {
           throw new Error(
             'La venta ya fue cancelada.'
           )
         }
 
+        /*
+         * IMPORTANTE:
+         *
+         * Antes de modificar la venta
+         * comprobamos si el día al que
+         * pertenece ya tiene un cierre
+         * de caja.
+         *
+         * Si la caja está cerrada,
+         * la cancelación se detiene
+         * completamente.
+         */
+        assertSaleBusinessDayOpen(
+          saleId
+        )
+
+        /*
+         * Obtenemos los productos de
+         * la venta para restaurar
+         * posteriormente el inventario.
+         */
         const items =
           database
             .prepare(
@@ -100,9 +139,11 @@ export function cancelSale(
 
                 FROM sale_items
 
-                WHERE sale_id = ?
+                WHERE
+                  sale_id = ?
 
-                ORDER BY id ASC
+                ORDER BY
+                  id ASC
               `
             )
             .all(
@@ -117,6 +158,13 @@ export function cancelSale(
           )
         }
 
+        /*
+         * Marcamos la venta como
+         * cancelada.
+         *
+         * El AND status = 'COMPLETED'
+         * añade una protección adicional.
+         */
         const saleUpdate =
           database
             .prepare(
@@ -152,6 +200,10 @@ export function cancelSale(
           )
         }
 
+        /*
+         * Consultas preparadas para
+         * restaurar el inventario.
+         */
         const getCategoryStock =
           database.prepare(
             `
@@ -160,7 +212,8 @@ export function cancelSale(
 
               FROM categories
 
-              WHERE id = ?
+              WHERE
+                id = ?
             `
           )
 
@@ -170,12 +223,14 @@ export function cancelSale(
               UPDATE categories
 
               SET
-                stock = stock + ?,
+                stock =
+                  stock + ?,
 
                 updated_at =
                   CURRENT_TIMESTAMP
 
-              WHERE id = ?
+              WHERE
+                id = ?
             `
           )
 
@@ -205,6 +260,10 @@ export function cancelSale(
             `
           )
 
+        /*
+         * Restauramos la cantidad
+         * vendida de cada categoría.
+         */
         for (
           const item
           of items
@@ -244,19 +303,36 @@ export function cancelSale(
             )
           }
 
+          /*
+           * Registramos también el
+           * movimiento de inventario
+           * correspondiente a la
+           * cancelación.
+           */
           insertMovement.run(
             item.categoryId,
+
             item.quantity,
+
             stockBefore,
+
             stockAfter,
+
             `Cancelación de venta #${saleId}`,
+
             canceledByUserId,
+
             saleId
           )
         }
       }
     )
 
+  /*
+   * Si cualquier paso anterior falla,
+   * SQLite revierte automáticamente
+   * toda la cancelación.
+   */
   cancelTransaction()
 
   return getSaleDetail(

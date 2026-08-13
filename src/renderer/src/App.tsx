@@ -21,6 +21,12 @@ import SetupPage
 import UsersPage
   from './pages/UsersPage'
 
+import ReportsPage
+  from './pages/ReportsPage'
+
+import CashClosingPage
+  from './pages/CashClosingPage'
+
 interface AuthUser {
   id: number
   username: string
@@ -40,6 +46,8 @@ type AppPage =
   | 'history'
   | 'categories'
   | 'users'
+  | 'reports'
+  | 'cash-closing'
 
 function App(): React.JSX.Element {
   const [
@@ -267,24 +275,64 @@ function App(): React.JSX.Element {
             </button>
 
             {isAdmin && (
-              <button
-                type="button"
-                className={
-                  `nav-button ${
-                    currentPage ===
-                    'users'
-                      ? 'nav-button-active'
-                      : ''
-                  }`
-                }
-                onClick={() =>
-                  setCurrentPage(
-                    'users'
-                  )
-                }
-              >
-                Usuarios
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={
+                    `nav-button ${
+                      currentPage ===
+                      'users'
+                        ? 'nav-button-active'
+                        : ''
+                    }`
+                  }
+                  onClick={() =>
+                    setCurrentPage(
+                      'users'
+                    )
+                  }
+                >
+                  Usuarios
+                </button>
+
+                <button
+                  type="button"
+                  className={
+                    `nav-button ${
+                      currentPage ===
+                      'reports'
+                        ? 'nav-button-active'
+                        : ''
+                    }`
+                  }
+                  onClick={() =>
+                    setCurrentPage(
+                      'reports'
+                    )
+                  }
+                >
+                  Reportes
+                </button>
+
+                <button
+                  type="button"
+                  className={
+                    `nav-button ${
+                      currentPage ===
+                      'cash-closing'
+                        ? 'nav-button-active'
+                        : ''
+                    }`
+                  }
+                  onClick={() =>
+                    setCurrentPage(
+                      'cash-closing'
+                    )
+                  }
+                >
+                  Cierre de caja
+                </button>
+              </>
             )}
           </nav>
         </div>
@@ -342,6 +390,18 @@ function App(): React.JSX.Element {
             handleCurrentUserUpdated
           }
         />
+      )}
+
+      {currentPage ===
+        'reports' &&
+        isAdmin && (
+        <ReportsPage />
+      )}
+
+      {currentPage ===
+        'cash-closing' &&
+        isAdmin && (
+        <CashClosingPage />
       )}
     </div>
   )

@@ -2,6 +2,10 @@ import {
   getDatabase
 } from '../database/connection'
 
+import {
+  assertCurrentBusinessDayOpen
+} from '../cash-closing/cash-closing.service'
+
 export type PaymentMethod =
   | 'CASH'
   | 'CARD'
@@ -85,7 +89,7 @@ interface SaleRow {
   id: number
 
   status:
-    'COMPLETED'
+    | 'COMPLETED'
     | 'CANCELED'
 
   payment_method:
@@ -142,7 +146,9 @@ function validateUserId(
   userId: number
 ): void {
   if (
-    !Number.isInteger(userId) ||
+    !Number.isInteger(
+      userId
+    ) ||
     userId <= 0
   ) {
     throw new Error(
@@ -169,7 +175,9 @@ function validateItems(
   items: unknown
 ): asserts items is CreateSaleItemInput[] {
   if (
-    !Array.isArray(items) ||
+    !Array.isArray(
+      items
+    ) ||
     items.length === 0
   ) {
     throw new Error(
@@ -188,7 +196,10 @@ function validateItems(
   const categoryIds =
     new Set<number>()
 
-  for (const item of items) {
+  for (
+    const item
+    of items
+  ) {
     if (
       !Number.isInteger(
         item?.categoryId
@@ -302,7 +313,9 @@ function calculateItem(
       quantity,
 
     subtotal,
+
     discountTotal,
+
     total
   }
 }
@@ -315,29 +328,38 @@ function getSaleById(
 
   const saleRow =
     database
-      .prepare(`
-        SELECT
-          sales.id,
-          sales.status,
-          sales.payment_method,
-          sales.subtotal,
-          sales.discount_total,
-          sales.total,
-          sales.created_by,
+      .prepare(
+        `
+          SELECT
+            sales.id,
 
-          users.username
-            AS created_by_username,
+            sales.status,
 
-          sales.created_at
+            sales.payment_method,
 
-        FROM sales
+            sales.subtotal,
 
-        INNER JOIN users
-          ON users.id =
-             sales.created_by
+            sales.discount_total,
 
-        WHERE sales.id = ?
-      `)
+            sales.total,
+
+            sales.created_by,
+
+            users.username
+              AS created_by_username,
+
+            sales.created_at
+
+          FROM sales
+
+          INNER JOIN users
+            ON users.id =
+              sales.created_by
+
+          WHERE
+            sales.id = ?
+        `
+      )
       .get(
         saleId
       ) as
@@ -352,21 +374,36 @@ function getSaleById(
 
   const itemRows =
     database
-      .prepare(`
-        SELECT
-          id,
-          category_id,
-          category_name,
-          unit_price,
-          discount_percent,
-          quantity,
-          subtotal,
-          discount_total,
-          total
-        FROM sale_items
-        WHERE sale_id = ?
-        ORDER BY id
-      `)
+      .prepare(
+        `
+          SELECT
+            id,
+
+            category_id,
+
+            category_name,
+
+            unit_price,
+
+            discount_percent,
+
+            quantity,
+
+            subtotal,
+
+            discount_total,
+
+            total
+
+          FROM sale_items
+
+          WHERE
+            sale_id = ?
+
+          ORDER BY
+            id
+        `
+      )
       .all(
         saleId
       ) as SaleItemRow[]
@@ -456,230 +493,292 @@ export function createSale(
    * Preparamos las consultas una vez.
    */
   const findCategory =
-    database.prepare(`
-      SELECT
-        id,
-        name,
-        price,
-        stock,
-        discount_percent,
-        active
-      FROM categories
-      WHERE id = ?
-    `)
+    database.prepare(
+      `
+        SELECT
+          id,
+
+          name,
+
+          price,
+
+          stock,
+
+          discount_percent,
+
+          active
+
+        FROM categories
+
+        WHERE
+          id = ?
+      `
+    )
 
   const insertSale =
-    database.prepare(`
-      INSERT INTO sales (
-        status,
-        payment_method,
-        subtotal,
-        discount_total,
-        total,
-        created_by
-      )
-      VALUES (
-        'COMPLETED',
-        ?,
-        ?,
-        ?,
-        ?,
-        ?
-      )
-    `)
+    database.prepare(
+      `
+        INSERT INTO sales (
+          status,
+          payment_method,
+          subtotal,
+          discount_total,
+          total,
+          created_by
+        )
+        VALUES (
+          'COMPLETED',
+          ?,
+          ?,
+          ?,
+          ?,
+          ?
+        )
+      `
+    )
 
   const insertSaleItem =
-    database.prepare(`
-      INSERT INTO sale_items (
-        sale_id,
-        category_id,
-        category_name,
-        unit_price,
-        discount_percent,
-        quantity,
-        subtotal,
-        discount_total,
-        total
-      )
-      VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?
-      )
-    `)
+    database.prepare(
+      `
+        INSERT INTO sale_items (
+          sale_id,
+          category_id,
+          category_name,
+          unit_price,
+          discount_percent,
+          quantity,
+          subtotal,
+          discount_total,
+          total
+        )
+        VALUES (
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?
+        )
+      `
+    )
 
   const updateStock =
-    database.prepare(`
-      UPDATE categories
-      SET
-        stock = stock - ?,
-        updated_at =
-          CURRENT_TIMESTAMP
-      WHERE id = ?
-        AND stock >= ?
-    `)
+    database.prepare(
+      `
+        UPDATE categories
+
+        SET
+          stock =
+            stock - ?,
+
+          updated_at =
+            CURRENT_TIMESTAMP
+
+        WHERE
+          id = ?
+
+          AND
+          stock >= ?
+      `
+    )
 
   const insertMovement =
-    database.prepare(`
-      INSERT INTO inventory_movements (
-        category_id,
-        movement_type,
-        quantity_change,
-        stock_before,
-        stock_after,
-        note,
-        user_id,
-        sale_id
-      )
-      VALUES (
-        ?,
-        'SALE',
-        ?,
-        ?,
-        ?,
-        ?,
-        ?,
-        ?
-      )
-    `)
+    database.prepare(
+      `
+        INSERT INTO inventory_movements (
+          category_id,
+          movement_type,
+          quantity_change,
+          stock_before,
+          stock_after,
+          note,
+          user_id,
+          sale_id
+        )
+        VALUES (
+          ?,
+          'SALE',
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?
+        )
+      `
+    )
 
   /*
-   * ESTA ES LA PARTE MÁS IMPORTANTE.
+   * Toda la venta se procesa dentro
+   * de una única transacción.
    *
-   * Todo sucede dentro de una sola
-   * transacción.
+   * Si cualquier operación falla,
+   * SQLite revierte todo.
    */
   const saveSale =
-    database.transaction(() => {
-      const calculatedItems:
-        CalculatedSaleItem[] = []
-
-      for (
-        const inputItem
-        of input.items
-      ) {
+    database.transaction(
+      (): number => {
         /*
-         * No confiamos en el precio,
-         * descuento ni stock enviados
-         * por React.
+         * IMPORTANTE:
          *
-         * Los leemos nuevamente
-         * directamente de SQLite.
+         * Antes de consultar stock,
+         * insertar la venta o modificar
+         * inventario verificamos que la
+         * caja del día siga abierta.
+         *
+         * Si la caja ya fue cerrada,
+         * se lanza un error y toda la
+         * operación se detiene.
          */
-        const category =
-          findCategory.get(
-            inputItem.categoryId
-          ) as
-            | CategoryRow
-            | undefined
+        assertCurrentBusinessDayOpen()
 
-        if (!category) {
-          throw new Error(
-            'Una categoría seleccionada ya no existe.'
+        const calculatedItems:
+          CalculatedSaleItem[] = []
+
+        for (
+          const inputItem
+          of input.items
+        ) {
+          /*
+           * Nunca confiamos en precio,
+           * descuento o stock enviados
+           * desde React.
+           *
+           * Los datos oficiales se leen
+           * nuevamente desde SQLite.
+           */
+          const category =
+            findCategory.get(
+              inputItem.categoryId
+            ) as
+              | CategoryRow
+              | undefined
+
+          if (!category) {
+            throw new Error(
+              'Una categoría seleccionada ya no existe.'
+            )
+          }
+
+          calculatedItems.push(
+            calculateItem(
+              category,
+              inputItem.quantity
+            )
           )
         }
 
-        calculatedItems.push(
-          calculateItem(
-            category,
-            inputItem.quantity
+        const subtotal =
+          calculatedItems.reduce(
+            (
+              accumulator,
+              item
+            ) =>
+              accumulator +
+              item.subtotal,
+            0
           )
-        )
-      }
 
-      const subtotal =
-        calculatedItems.reduce(
-          (
-            accumulator,
-            item
-          ) =>
-            accumulator +
-            item.subtotal,
-          0
-        )
+        const discountTotal =
+          calculatedItems.reduce(
+            (
+              accumulator,
+              item
+            ) =>
+              accumulator +
+              item.discountTotal,
+            0
+          )
 
-      const discountTotal =
-        calculatedItems.reduce(
-          (
-            accumulator,
-            item
-          ) =>
-            accumulator +
-            item.discountTotal,
-          0
-        )
+        const total =
+          subtotal -
+          discountTotal
 
-      const total =
-        subtotal -
-        discountTotal
+        const saleResult =
+          insertSale.run(
+            input.paymentMethod,
+            subtotal,
+            discountTotal,
+            total,
+            userId
+          )
 
-      const saleResult =
-        insertSale.run(
-          input.paymentMethod,
-          subtotal,
-          discountTotal,
-          total,
-          userId
-        )
-
-      const saleId =
-        Number(
-          saleResult.lastInsertRowid
-        )
-
-      for (
-        const item
-        of calculatedItems
-      ) {
-        insertSaleItem.run(
-          saleId,
-          item.categoryId,
-          item.categoryName,
-          item.unitPrice,
-          item.discountPercent,
-          item.quantity,
-          item.subtotal,
-          item.discountTotal,
-          item.total
-        )
-
-        /*
-         * El WHERE stock >= ?
-         * agrega otra protección contra
-         * inventario negativo.
-         */
-        const stockResult =
-          updateStock.run(
-            item.quantity,
-            item.categoryId,
-            item.quantity
+        const saleId =
+          Number(
+            saleResult.lastInsertRowid
           )
 
         if (
-          stockResult.changes !== 1
+          !Number.isInteger(
+            saleId
+          ) ||
+          saleId <= 0
         ) {
           throw new Error(
-            `No hay suficientes existencias de "${item.categoryName}".`
+            'No se pudo registrar la venta.'
           )
         }
 
-        insertMovement.run(
-          item.categoryId,
+        for (
+          const item
+          of calculatedItems
+        ) {
+          insertSaleItem.run(
+            saleId,
+            item.categoryId,
+            item.categoryName,
+            item.unitPrice,
+            item.discountPercent,
+            item.quantity,
+            item.subtotal,
+            item.discountTotal,
+            item.total
+          )
 
-          -item.quantity,
+          /*
+           * El WHERE stock >= ?
+           * evita que el inventario pueda
+           * quedar en negativo.
+           */
+          const stockResult =
+            updateStock.run(
+              item.quantity,
+              item.categoryId,
+              item.quantity
+            )
 
-          item.stockBefore,
+          if (
+            stockResult.changes !==
+            1
+          ) {
+            throw new Error(
+              `No hay suficientes existencias de "${item.categoryName}".`
+            )
+          }
 
-          item.stockAfter,
+          insertMovement.run(
+            item.categoryId,
 
-          `Venta #${saleId}`,
+            -item.quantity,
 
-          userId,
+            item.stockBefore,
 
-          saleId
-        )
+            item.stockAfter,
+
+            `Venta #${saleId}`,
+
+            userId,
+
+            saleId
+          )
+        }
+
+        return saleId
       }
-
-      return saleId
-    })
+    )
 
   const saleId =
     saveSale()
