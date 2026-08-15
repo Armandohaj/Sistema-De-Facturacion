@@ -307,59 +307,187 @@ const migrations: Migration[] = [
   },
 
   {
-  version: 4,
-  name: 'cash_closings',
-  sql: `
-    CREATE TABLE cash_closings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+    version: 4,
+    name: 'cash_closings',
+    sql: `
+      CREATE TABLE cash_closings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-      business_date TEXT NOT NULL UNIQUE,
+        business_date TEXT NOT NULL UNIQUE,
 
-      completed_sales_count INTEGER NOT NULL
-        CHECK (completed_sales_count >= 0),
+        completed_sales_count INTEGER NOT NULL
+          CHECK (
+            completed_sales_count >= 0
+          ),
 
-      canceled_sales_count INTEGER NOT NULL
-        CHECK (canceled_sales_count >= 0),
+        canceled_sales_count INTEGER NOT NULL
+          CHECK (
+            canceled_sales_count >= 0
+          ),
 
-      sales_total INTEGER NOT NULL
-        CHECK (sales_total >= 0),
+        sales_total INTEGER NOT NULL
+          CHECK (
+            sales_total >= 0
+          ),
 
-      cash_sales INTEGER NOT NULL
-        CHECK (cash_sales >= 0),
+        cash_sales INTEGER NOT NULL
+          CHECK (
+            cash_sales >= 0
+          ),
 
-      card_sales INTEGER NOT NULL
-        CHECK (card_sales >= 0),
+        card_sales INTEGER NOT NULL
+          CHECK (
+            card_sales >= 0
+          ),
 
-      sinpe_sales INTEGER NOT NULL
-        CHECK (sinpe_sales >= 0),
+        sinpe_sales INTEGER NOT NULL
+          CHECK (
+            sinpe_sales >= 0
+          ),
 
-      opening_cash INTEGER NOT NULL
-        DEFAULT 0
-        CHECK (opening_cash >= 0),
+        opening_cash INTEGER NOT NULL
+          DEFAULT 0
+          CHECK (
+            opening_cash >= 0
+          ),
 
-      expected_cash INTEGER NOT NULL
-        CHECK (expected_cash >= 0),
+        expected_cash INTEGER NOT NULL
+          CHECK (
+            expected_cash >= 0
+          ),
 
-      counted_cash INTEGER NOT NULL
-        CHECK (counted_cash >= 0),
+        counted_cash INTEGER NOT NULL
+          CHECK (
+            counted_cash >= 0
+          ),
 
-      cash_difference INTEGER NOT NULL,
+        cash_difference INTEGER NOT NULL,
 
-      closed_by INTEGER NOT NULL,
+        closed_by INTEGER NOT NULL,
 
-      closed_at TEXT NOT NULL
-        DEFAULT CURRENT_TIMESTAMP,
+        closed_at TEXT NOT NULL
+          DEFAULT CURRENT_TIMESTAMP,
 
-      FOREIGN KEY (closed_by)
-        REFERENCES users(id)
-        ON DELETE RESTRICT
-    );
+        FOREIGN KEY (closed_by)
+          REFERENCES users(id)
+          ON DELETE RESTRICT
+      );
 
-    CREATE INDEX idx_cash_closings_closed_at
+      CREATE INDEX
+        idx_cash_closings_closed_at
       ON cash_closings(closed_at);
-  `
-  }
+    `
+  },
 
+  {
+    version: 5,
+    name: 'cash_closing_reopen_support',
+    sql: `
+      /*
+       * Estado actual de la jornada.
+       *
+       * CLOSED:
+       *   la caja está cerrada y no
+       *   permite ventas ni cancelaciones.
+       *
+       * REOPENED:
+       *   un administrador reabrió la
+       *   jornada y vuelve a permitir
+       *   operaciones.
+       */
+      ALTER TABLE cash_closings
+      ADD COLUMN status TEXT NOT NULL
+        DEFAULT 'CLOSED'
+        CHECK (
+          status IN (
+            'CLOSED',
+            'REOPENED'
+          )
+        );
+
+      CREATE INDEX
+        idx_cash_closings_status
+      ON cash_closings(status);
+
+      /*
+       * Historial completo de eventos
+       * relacionados con el cierre.
+       *
+       * Esto permite conservar:
+       *
+       * - cierre inicial;
+       * - reapertura;
+       * - segundo cierre;
+       * - otra reapertura;
+       * - etc.
+       *
+       * Nunca eliminamos el historial
+       * anterior.
+       */
+      CREATE TABLE cash_closing_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+        cash_closing_id INTEGER NOT NULL,
+
+        event_type TEXT NOT NULL
+          CHECK (
+            event_type IN (
+              'CLOSED',
+              'REOPENED'
+            )
+          ),
+
+        user_id INTEGER NOT NULL,
+
+        reason TEXT,
+
+        created_at TEXT NOT NULL
+          DEFAULT CURRENT_TIMESTAMP,
+
+        FOREIGN KEY (cash_closing_id)
+          REFERENCES cash_closings(id)
+          ON DELETE CASCADE,
+
+        FOREIGN KEY (user_id)
+          REFERENCES users(id)
+          ON DELETE RESTRICT
+      );
+
+      CREATE INDEX
+        idx_cash_closing_events_closing
+      ON cash_closing_events(
+        cash_closing_id
+      );
+
+      CREATE INDEX
+        idx_cash_closing_events_created_at
+      ON cash_closing_events(
+        created_at
+      );
+
+      /*
+       * Los cierres que ya existían antes
+       * de esta migración también deben
+       * quedar registrados en el nuevo
+       * historial.
+       */
+      INSERT INTO cash_closing_events (
+        cash_closing_id,
+        event_type,
+        user_id,
+        reason,
+        created_at
+      )
+      SELECT
+        id,
+        'CLOSED',
+        closed_by,
+        NULL,
+        closed_at
+
+      FROM cash_closings;
+    `
+  }
 ]
 
 export function runMigrations(
@@ -376,20 +504,26 @@ export function runMigrations(
     );
   `)
 
-  const appliedRows = database
-    .prepare(`
-      SELECT version
-      FROM schema_migrations
-      ORDER BY version
-    `)
-    .all() as Array<{
-      version: number
-    }>
+  const appliedRows =
+    database
+      .prepare(`
+        SELECT
+          version
+
+        FROM schema_migrations
+
+        ORDER BY
+          version
+      `)
+      .all() as Array<{
+        version: number
+      }>
 
   const appliedVersions =
     new Set(
       appliedRows.map(
-        (row) => row.version
+        (row) =>
+          row.version
       )
     )
 
@@ -399,7 +533,10 @@ export function runMigrations(
         version,
         name
       )
-      VALUES (?, ?)
+      VALUES (
+        ?,
+        ?
+      )
     `)
 
   const applyMigration =
@@ -420,7 +557,10 @@ export function runMigrations(
 
   const orderedMigrations =
     [...migrations].sort(
-      (first, second) =>
+      (
+        first,
+        second
+      ) =>
         first.version -
         second.version
     )

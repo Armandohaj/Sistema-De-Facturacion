@@ -247,15 +247,29 @@ export interface DailyClosingSummary {
 
   total: number
 
-  paymentMethods: CashClosingPaymentSummary
+  paymentMethods:
+    CashClosingPaymentSummary
 
-  mostSold: DailyProductSummary | null
-  leastSold: DailyProductSummary | null
+  mostSold:
+    DailyProductSummary | null
+
+  leastSold:
+    DailyProductSummary | null
 }
+
+export type CashClosingStatus =
+  | 'CLOSED'
+  | 'REOPENED'
+
+export type CashClosingEventType =
+  | 'CLOSED'
+  | 'REOPENED'
 
 export interface CashClosing {
   id: number
   businessDate: string
+
+  status: CashClosingStatus
 
   completedSalesCount: number
   canceledSalesCount: number
@@ -276,9 +290,29 @@ export interface CashClosing {
   closedAt: string
 }
 
+export interface CashClosingEvent {
+  id: number
+  cashClosingId: number
+
+  eventType:
+    CashClosingEventType
+
+  userId: number
+  username: string
+
+  reason: string | null
+
+  createdAt: string
+}
+
 export interface CashClosingDay {
   summary: DailyClosingSummary
-  closing: CashClosing | null
+
+  closing:
+    CashClosing | null
+
+  events:
+    CashClosingEvent[]
 }
 
 export interface CreateCashClosingInput {
@@ -287,6 +321,10 @@ export interface CreateCashClosingInput {
   countedCash: number
 }
 
+export interface ReopenCashClosingInput {
+  date: string
+  reason: string
+}
 
 export type IpcResult<T> =
   | {
@@ -300,21 +338,23 @@ export type IpcResult<T> =
 
 const posApi = {
   app: {
-    getInfo: (): Promise<AppInfo> => {
-      return ipcRenderer.invoke(
-        'app:get-info'
-      )
-    }
+    getInfo:
+      (): Promise<AppInfo> => {
+        return ipcRenderer.invoke(
+          'app:get-info'
+        )
+      }
   },
 
   auth: {
-    getStatus: (): Promise<
-      IpcResult<AuthStatus>
-    > => {
-      return ipcRenderer.invoke(
-        'auth:get-status'
-      )
-    },
+    getStatus:
+      (): Promise<
+        IpcResult<AuthStatus>
+      > => {
+        return ipcRenderer.invoke(
+          'auth:get-status'
+        )
+      },
 
     setup: (
       input: SetupAdminInput
@@ -338,33 +378,36 @@ const posApi = {
       )
     },
 
-    logout: (): Promise<
-      IpcResult<null>
-    > => {
-      return ipcRenderer.invoke(
-        'auth:logout'
-      )
-    }
+    logout:
+      (): Promise<
+        IpcResult<null>
+      > => {
+        return ipcRenderer.invoke(
+          'auth:logout'
+        )
+      }
   },
 
   database: {
-    getStatus: (): Promise<
-      DatabaseStatus
-    > => {
-      return ipcRenderer.invoke(
-        'database:get-status'
-      )
-    }
+    getStatus:
+      (): Promise<
+        DatabaseStatus
+      > => {
+        return ipcRenderer.invoke(
+          'database:get-status'
+        )
+      }
   },
 
   categories: {
-    list: (): Promise<
-      IpcResult<Category[]>
-    > => {
-      return ipcRenderer.invoke(
-        'categories:list'
-      )
-    },
+    list:
+      (): Promise<
+        IpcResult<Category[]>
+      > => {
+        return ipcRenderer.invoke(
+          'categories:list'
+        )
+      },
 
     create: (
       input: CategoryInput
@@ -420,13 +463,14 @@ const posApi = {
   },
 
   users: {
-    list: (): Promise<
-      IpcResult<UserRecord[]>
-    > => {
-      return ipcRenderer.invoke(
-        'users:list'
-      )
-    },
+    list:
+      (): Promise<
+        IpcResult<UserRecord[]>
+      > => {
+        return ipcRenderer.invoke(
+          'users:list'
+        )
+      },
 
     create: (
       input: CreateUserInput
@@ -454,7 +498,9 @@ const posApi = {
   sales: {
     create: (
       input: CreateSaleInput
-    ): Promise<IpcResult<Sale>> => {
+    ): Promise<
+      IpcResult<Sale>
+    > => {
       return ipcRenderer.invoke(
         'sales:create',
         input
@@ -462,8 +508,13 @@ const posApi = {
     },
 
     listHistory: (
-      filters: SaleHistoryFilters = {}
-    ): Promise<IpcResult<SaleHistoryItem[]>> => {
+      filters:
+        SaleHistoryFilters = {}
+    ): Promise<
+      IpcResult<
+        SaleHistoryItem[]
+      >
+    > => {
       return ipcRenderer.invoke(
         'sales:list-history',
         filters
@@ -472,7 +523,9 @@ const posApi = {
 
     getDetail: (
       saleId: number
-    ): Promise<IpcResult<SaleDetail>> => {
+    ): Promise<
+      IpcResult<SaleDetail>
+    > => {
       return ipcRenderer.invoke(
         'sales:get-detail',
         saleId
@@ -481,13 +534,16 @@ const posApi = {
 
     cancel: (
       saleId: number
-    ): Promise<IpcResult<SaleDetail>> => {
+    ): Promise<
+      IpcResult<SaleDetail>
+    > => {
       return ipcRenderer.invoke(
         'sales:cancel',
         saleId
       )
     }
   },
+
   reports: {
     getSummary:
       (): Promise<
@@ -509,33 +565,43 @@ const posApi = {
       )
     }
   },
-  
+
   cashClosing: {
-  getDay: (
-    date: string
-  ): Promise<
-    IpcResult<CashClosingDay>
-  > => {
-    return ipcRenderer.invoke(
-      'cash-closing:get-day',
-      date
-    )
-  },
+    getDay: (
+      date: string
+    ): Promise<
+      IpcResult<CashClosingDay>
+    > => {
+      return ipcRenderer.invoke(
+        'cash-closing:get-day',
+        date
+      )
+    },
 
-  create: (
-    input: CreateCashClosingInput
-  ): Promise<
-    IpcResult<CashClosing>
-  > => {
-    return ipcRenderer.invoke(
-      'cash-closing:create',
-      input
-    )
+    create: (
+      input:
+        CreateCashClosingInput
+    ): Promise<
+      IpcResult<CashClosing>
+    > => {
+      return ipcRenderer.invoke(
+        'cash-closing:create',
+        input
+      )
+    },
+
+    reopen: (
+      input:
+        ReopenCashClosingInput
+    ): Promise<
+      IpcResult<CashClosing>
+    > => {
+      return ipcRenderer.invoke(
+        'cash-closing:reopen',
+        input
+      )
+    }
   }
-}
-
-
-
 }
 
 contextBridge.exposeInMainWorld(

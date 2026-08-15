@@ -122,6 +122,25 @@ function App(): React.JSX.Element {
   function handleCurrentUserUpdated(
     user: AuthUser
   ): void {
+    /*
+     * Si un administrador cambia su
+     * propio rol a EMPLOYEE mientras
+     * está dentro de una página exclusiva
+     * de administrador, lo regresamos a
+     * Venta para evitar una pantalla vacía.
+     */
+    if (
+      user.role === 'EMPLOYEE' &&
+      (
+        currentPage === 'users' ||
+        currentPage === 'reports'
+      )
+    ) {
+      setCurrentPage(
+        'sales'
+      )
+    }
+
     setAuthStatus({
       setupRequired: false,
       user
@@ -313,27 +332,27 @@ function App(): React.JSX.Element {
                 >
                   Reportes
                 </button>
-
-                <button
-                  type="button"
-                  className={
-                    `nav-button ${
-                      currentPage ===
-                      'cash-closing'
-                        ? 'nav-button-active'
-                        : ''
-                    }`
-                  }
-                  onClick={() =>
-                    setCurrentPage(
-                      'cash-closing'
-                    )
-                  }
-                >
-                  Cierre de caja
-                </button>
               </>
             )}
+
+            <button
+              type="button"
+              className={
+                `nav-button ${
+                  currentPage ===
+                  'cash-closing'
+                    ? 'nav-button-active'
+                    : ''
+                }`
+              }
+              onClick={() =>
+                setCurrentPage(
+                  'cash-closing'
+                )
+              }
+            >
+              Cierre de caja
+            </button>
           </nav>
         </div>
 
@@ -399,8 +418,7 @@ function App(): React.JSX.Element {
       )}
 
       {currentPage ===
-        'cash-closing' &&
-        isAdmin && (
+        'cash-closing' && (
         <CashClosingPage />
       )}
     </div>

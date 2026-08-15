@@ -3,6 +3,9 @@ import {
   type FormEvent
 } from 'react'
 
+import storeLogo
+  from '../assets/logo.png'
+
 interface AuthUser {
   id: number
   username: string
@@ -73,7 +76,11 @@ function LoginPage({
     <main className="auth-page">
       <section className="auth-card">
         <div className="auth-heading">
-          <h1>Tienda De Ropa La Vega</h1>
+          <img
+            className="login-logo"
+            src={storeLogo}
+            alt="Logo de Tienda De Ropa La Vega"
+          />
 
           <p>
             Ingresa con tu usuario

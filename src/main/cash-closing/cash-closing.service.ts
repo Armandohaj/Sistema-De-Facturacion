@@ -2,6 +2,14 @@ import {
   getDatabase
 } from '../database/connection'
 
+export type CashClosingStatus =
+  | 'CLOSED'
+  | 'REOPENED'
+
+export type CashClosingEventType =
+  | 'CLOSED'
+  | 'REOPENED'
+
 export interface PaymentMethodSummary {
   cash: number
   card: number
@@ -33,6 +41,8 @@ export interface CashClosing {
   id: number
   businessDate: string
 
+  status: CashClosingStatus
+
   completedSalesCount: number
   canceledSalesCount: number
 
@@ -52,15 +62,31 @@ export interface CashClosing {
   closedAt: string
 }
 
+export interface CashClosingEvent {
+  id: number
+  cashClosingId: number
+  eventType: CashClosingEventType
+  userId: number
+  username: string
+  reason: string | null
+  createdAt: string
+}
+
 export interface CashClosingDay {
   summary: DailyClosingSummary
   closing: CashClosing | null
+  events: CashClosingEvent[]
 }
 
 export interface CreateCashClosingInput {
   date: string
   openingCash: number
   countedCash: number
+}
+
+export interface ReopenCashClosingInput {
+  date: string
+  reason: string
 }
 
 interface DailySalesRow {
@@ -86,6 +112,8 @@ interface CashClosingRow {
   id: number
   businessDate: string
 
+  status: CashClosingStatus
+
   completedSalesCount: number
   canceledSalesCount: number
 
@@ -105,9 +133,24 @@ interface CashClosingRow {
   closedAt: string
 }
 
+interface CashClosingEventRow {
+  id: number
+  cashClosingId: number
+  eventType: CashClosingEventType
+  userId: number
+  username: string
+  reason: string | null
+  createdAt: string
+}
+
 interface SaleClosingRow {
   id: number
   businessDate: string
+}
+
+interface ExistingClosingRow {
+  id: number
+  status: CashClosingStatus
 }
 
 function getCurrentDateKey(): string {
@@ -206,12 +249,38 @@ function validatePositiveInteger(
   }
 }
 
+function validateReopenReason(
+  reason: string
+): string {
+  const normalizedReason =
+    reason.trim()
+
+  if (
+    normalizedReason.length < 3
+  ) {
+    throw new Error(
+      'Debes indicar el motivo de la reapertura.'
+    )
+  }
+
+  if (
+    normalizedReason.length > 300
+  ) {
+    throw new Error(
+      'El motivo de la reapertura es demasiado largo.'
+    )
+  }
+
+  return normalizedReason
+}
+
 /*
- * Protege la creación de nuevas ventas.
+ * Bloquea nuevas ventas únicamente
+ * cuando la caja del día actual está
+ * realmente CERRADA.
  *
- * Si ya existe un cierre de caja
- * correspondiente al día actual,
- * ninguna nueva venta puede registrarse.
+ * Una caja REOPENED permite nuevamente
+ * registrar ventas.
  */
 export function assertCurrentBusinessDayOpen():
 void {
@@ -234,6 +303,9 @@ void {
                 'localtime'
               )
 
+            AND
+            status = 'CLOSED'
+
           LIMIT 1
         `
       )
@@ -243,17 +315,18 @@ void {
 
   if (closing) {
     throw new Error(
-      'La caja de hoy ya fue cerrada. No se pueden registrar más ventas.'
+      'La caja de hoy está cerrada. Debe ser reabierta por un administrador antes de registrar nuevas ventas.'
     )
   }
 }
 
 /*
- * Protege las ventas históricas.
+ * Una venta solamente queda protegida
+ * si la jornada a la que pertenece
+ * está actualmente CLOSED.
  *
- * Si el día al que pertenece una venta
- * ya tiene cierre de caja, esa venta
- * no puede modificarse ni cancelarse.
+ * Si el administrador reabre esa caja,
+ * la venta vuelve a poder cancelarse.
  */
 export function assertSaleBusinessDayOpen(
   saleId: number
@@ -288,6 +361,9 @@ export function assertSaleBusinessDayOpen(
           WHERE
             s.id = ?
 
+            AND
+            cc.status = 'CLOSED'
+
           LIMIT 1
         `
       )
@@ -299,7 +375,7 @@ export function assertSaleBusinessDayOpen(
 
   if (closing) {
     throw new Error(
-      `La caja del ${closing.businessDate} ya fue cerrada. Esta venta ya no puede modificarse.`
+      `La caja del ${closing.businessDate} está cerrada. Debe ser reabierta antes de modificar esta venta.`
     )
   }
 }
@@ -552,6 +628,9 @@ export function getCashClosing(
             cc.business_date
               AS businessDate,
 
+            cc.status
+              AS status,
+
             cc.completed_sales_count
               AS completedSalesCount,
 
@@ -616,6 +695,63 @@ export function getCashClosing(
   return row
 }
 
+export function getCashClosingEvents(
+  cashClosingId: number
+): CashClosingEvent[] {
+  validatePositiveInteger(
+    cashClosingId,
+    'El cierre de caja'
+  )
+
+  const database =
+    getDatabase()
+
+  const rows =
+    database
+      .prepare(
+        `
+          SELECT
+            cce.id AS id,
+
+            cce.cash_closing_id
+              AS cashClosingId,
+
+            cce.event_type
+              AS eventType,
+
+            cce.user_id
+              AS userId,
+
+            u.username
+              AS username,
+
+            cce.reason
+              AS reason,
+
+            cce.created_at
+              AS createdAt
+
+          FROM cash_closing_events
+            AS cce
+
+          INNER JOIN users AS u
+            ON u.id =
+              cce.user_id
+
+          WHERE
+            cce.cash_closing_id = ?
+
+          ORDER BY
+            cce.id ASC
+        `
+      )
+      .all(
+        cashClosingId
+      ) as CashClosingEventRow[]
+
+  return rows
+}
+
 export function getCashClosingDay(
   date: string
 ): CashClosingDay {
@@ -623,19 +759,33 @@ export function getCashClosingDay(
     date
   )
 
+  const closing =
+    getCashClosing(
+      date
+    )
+
   return {
     summary:
       getDailyClosingSummary(
         date
       ),
 
-    closing:
-      getCashClosing(
-        date
-      )
+    closing,
+
+    events:
+      closing
+        ? getCashClosingEvents(
+            closing.id
+          )
+        : []
   }
 }
 
+/*
+ * Registra un cierre nuevo o vuelve
+ * a cerrar una caja que anteriormente
+ * fue REOPENED.
+ */
 export function createCashClosing(
   input: CreateCashClosingInput,
   closedByUserId: number
@@ -670,7 +820,8 @@ export function createCashClosing(
             .prepare(
               `
                 SELECT
-                  id
+                  id,
+                  status
 
                 FROM cash_closings
 
@@ -683,14 +834,21 @@ export function createCashClosing(
             .get(
               input.date
             ) as
-              | { id: number }
+              | ExistingClosingRow
               | undefined
 
+        /*
+         * Si ya está CLOSED no podemos
+         * cerrarla otra vez.
+         *
+         * Primero tendría que reabrirse.
+         */
         if (
-          existingClosing
+          existingClosing?.status ===
+          'CLOSED'
         ) {
           throw new Error(
-            'Esta fecha ya tiene un cierre de caja registrado.'
+            'Esta fecha ya tiene una caja cerrada.'
           )
         }
 
@@ -707,64 +865,207 @@ export function createCashClosing(
           input.countedCash -
           expectedCash
 
+        let cashClosingId:
+          number
+
+        /*
+         * Primera vez que se cierra
+         * esta jornada.
+         */
+        if (
+          !existingClosing
+        ) {
+          const result =
+            database
+              .prepare(
+                `
+                  INSERT INTO cash_closings (
+                    business_date,
+
+                    status,
+
+                    completed_sales_count,
+                    canceled_sales_count,
+
+                    sales_total,
+
+                    cash_sales,
+                    card_sales,
+                    sinpe_sales,
+
+                    opening_cash,
+                    expected_cash,
+                    counted_cash,
+                    cash_difference,
+
+                    closed_by,
+                    closed_at
+                  )
+                  VALUES (
+                    ?,
+                    'CLOSED',
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    CURRENT_TIMESTAMP
+                  )
+                `
+              )
+              .run(
+                input.date,
+
+                summary.completedSalesCount,
+                summary.canceledSalesCount,
+
+                summary.total,
+
+                summary.paymentMethods.cash,
+                summary.paymentMethods.card,
+                summary.paymentMethods.sinpe,
+
+                input.openingCash,
+                expectedCash,
+                input.countedCash,
+                cashDifference,
+
+                closedByUserId
+              )
+
+          cashClosingId =
+            Number(
+              result.lastInsertRowid
+            )
+
+          if (
+            !Number.isInteger(
+              cashClosingId
+            ) ||
+            cashClosingId <= 0
+          ) {
+            throw new Error(
+              'No se pudo registrar el cierre de caja.'
+            )
+          }
+        } else {
+          /*
+           * La caja existe pero está
+           * REOPENED.
+           *
+           * Actualizamos el mismo cierre
+           * con los nuevos valores de la
+           * jornada.
+           */
+          cashClosingId =
+            existingClosing.id
+
+          const updateResult =
+            database
+              .prepare(
+                `
+                  UPDATE cash_closings
+
+                  SET
+                    status = 'CLOSED',
+
+                    completed_sales_count = ?,
+
+                    canceled_sales_count = ?,
+
+                    sales_total = ?,
+
+                    cash_sales = ?,
+
+                    card_sales = ?,
+
+                    sinpe_sales = ?,
+
+                    opening_cash = ?,
+
+                    expected_cash = ?,
+
+                    counted_cash = ?,
+
+                    cash_difference = ?,
+
+                    closed_by = ?,
+
+                    closed_at =
+                      CURRENT_TIMESTAMP
+
+                  WHERE
+                    id = ?
+
+                    AND
+                    status = 'REOPENED'
+                `
+              )
+              .run(
+                summary.completedSalesCount,
+
+                summary.canceledSalesCount,
+
+                summary.total,
+
+                summary.paymentMethods.cash,
+
+                summary.paymentMethods.card,
+
+                summary.paymentMethods.sinpe,
+
+                input.openingCash,
+
+                expectedCash,
+
+                input.countedCash,
+
+                cashDifference,
+
+                closedByUserId,
+
+                existingClosing.id
+              )
+
+          if (
+            updateResult.changes !==
+            1
+          ) {
+            throw new Error(
+              'No se pudo volver a cerrar la caja.'
+            )
+          }
+        }
+
+        /*
+         * Cada cierre queda registrado
+         * en el historial.
+         */
         database
           .prepare(
             `
-              INSERT INTO cash_closings (
-                business_date,
-
-                completed_sales_count,
-                canceled_sales_count,
-
-                sales_total,
-
-                cash_sales,
-                card_sales,
-                sinpe_sales,
-
-                opening_cash,
-                expected_cash,
-                counted_cash,
-                cash_difference,
-
-                closed_by
+              INSERT INTO cash_closing_events (
+                cash_closing_id,
+                event_type,
+                user_id,
+                reason
               )
               VALUES (
                 ?,
+                'CLOSED',
                 ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?
+                NULL
               )
             `
           )
           .run(
-            input.date,
-
-            summary.completedSalesCount,
-            summary.canceledSalesCount,
-
-            summary.total,
-
-            summary.paymentMethods.cash,
-            summary.paymentMethods.card,
-            summary.paymentMethods.sinpe,
-
-            input.openingCash,
-
-            expectedCash,
-
-            input.countedCash,
-
-            cashDifference,
-
+            cashClosingId,
             closedByUserId
           )
       }
@@ -784,4 +1085,142 @@ export function createCashClosing(
   }
 
   return closing
+}
+
+/*
+ * Reabre una caja cerrada.
+ *
+ * No borramos el cierre original.
+ * Cambiamos su estado y registramos
+ * un evento REOPENED.
+ */
+export function reopenCashClosing(
+  input: ReopenCashClosingInput,
+  reopenedByUserId: number
+): CashClosing {
+  validateDate(
+    input.date
+  )
+
+  validatePositiveInteger(
+    reopenedByUserId,
+    'El usuario que realiza la reapertura'
+  )
+
+  const reason =
+    validateReopenReason(
+      input.reason
+    )
+
+  const database =
+    getDatabase()
+
+  const transaction =
+    database.transaction(
+      (): void => {
+        const closing =
+          database
+            .prepare(
+              `
+                SELECT
+                  id,
+                  status
+
+                FROM cash_closings
+
+                WHERE
+                  business_date = ?
+
+                LIMIT 1
+              `
+            )
+            .get(
+              input.date
+            ) as
+              | ExistingClosingRow
+              | undefined
+
+        if (!closing) {
+          throw new Error(
+            'No existe un cierre de caja para esta fecha.'
+          )
+        }
+
+        if (
+          closing.status ===
+          'REOPENED'
+        ) {
+          throw new Error(
+            'Esta caja ya se encuentra reabierta.'
+          )
+        }
+
+        const updateResult =
+          database
+            .prepare(
+              `
+                UPDATE cash_closings
+
+                SET
+                  status = 'REOPENED'
+
+                WHERE
+                  id = ?
+
+                  AND
+                  status = 'CLOSED'
+              `
+            )
+            .run(
+              closing.id
+            )
+
+        if (
+          updateResult.changes !==
+          1
+        ) {
+          throw new Error(
+            'No se pudo reabrir la caja.'
+          )
+        }
+
+        database
+          .prepare(
+            `
+              INSERT INTO cash_closing_events (
+                cash_closing_id,
+                event_type,
+                user_id,
+                reason
+              )
+              VALUES (
+                ?,
+                'REOPENED',
+                ?,
+                ?
+              )
+            `
+          )
+          .run(
+            closing.id,
+            reopenedByUserId,
+            reason
+          )
+      }
+    )
+
+  transaction()
+
+  const reopenedClosing =
+    getCashClosing(
+      input.date
+    )
+
+  if (!reopenedClosing) {
+    throw new Error(
+      'La caja fue reabierta, pero no pudo recuperarse.'
+    )
+  }
+
+  return reopenedClosing
 }

@@ -28,9 +28,19 @@ interface DailySummary {
   leastSold: ProductSummary | null
 }
 
+type CashClosingStatus =
+  | 'CLOSED'
+  | 'REOPENED'
+
+type CashClosingEventType =
+  | 'CLOSED'
+  | 'REOPENED'
+
 interface CashClosing {
   id: number
   businessDate: string
+
+  status: CashClosingStatus
 
   completedSalesCount: number
   canceledSalesCount: number
@@ -51,9 +61,25 @@ interface CashClosing {
   closedAt: string
 }
 
+interface CashClosingEvent {
+  id: number
+  cashClosingId: number
+
+  eventType:
+    CashClosingEventType
+
+  userId: number
+  username: string
+
+  reason: string | null
+
+  createdAt: string
+}
+
 interface CashClosingDay {
   summary: DailySummary
   closing: CashClosing | null
+  events: CashClosingEvent[]
 }
 
 interface Message {
@@ -219,6 +245,11 @@ React.JSX.Element {
   ] = useState(false)
 
   const [
+    reopening,
+    setReopening
+  ] = useState(false)
+
+  const [
     message,
     setMessage
   ] =
@@ -227,17 +258,33 @@ React.JSX.Element {
     >(null)
 
   const [
-    showConfirmation,
-    setShowConfirmation
+    showClosingConfirmation,
+    setShowClosingConfirmation
   ] = useState(false)
+
+  const [
+    showReopenConfirmation,
+    setShowReopenConfirmation
+  ] = useState(false)
+
+  const [
+    reopenReason,
+    setReopenReason
+  ] = useState('')
 
   const loadDay =
     useCallback(
       async (
-        date: string
+        date: string,
+        clearMessage = true
       ): Promise<void> => {
         setLoading(true)
-        setMessage(null)
+
+        if (
+          clearMessage
+        ) {
+          setMessage(null)
+        }
 
         try {
           const result =
@@ -250,7 +297,8 @@ React.JSX.Element {
           if (!result.success) {
             setMessage({
               type: 'error',
-              text: result.message
+              text:
+                result.message
             })
 
             setDay(null)
@@ -262,22 +310,38 @@ React.JSX.Element {
             result.data
           )
 
-          if (
+          const closing =
             result.data.closing
+
+          if (
+            closing
           ) {
             setOpeningCash(
               String(
-                result.data.closing
-                  .openingCash
+                closing.openingCash
               )
             )
 
-            setCountedCash(
-              String(
-                result.data.closing
-                  .countedCash
+            /*
+             * Si está reabierta,
+             * obligamos a volver a
+             * contar el efectivo antes
+             * del siguiente cierre.
+             */
+            if (
+              closing.status ===
+              'REOPENED'
+            ) {
+              setCountedCash(
+                ''
               )
-            )
+            } else {
+              setCountedCash(
+                String(
+                  closing.countedCash
+                )
+              )
+            }
           } else {
             setOpeningCash(
               '0'
@@ -318,13 +382,23 @@ React.JSX.Element {
     loadDay
   ])
 
+  const isClosed =
+    day?.closing?.status ===
+    'CLOSED'
+
+  const isReopened =
+    day?.closing?.status ===
+    'REOPENED'
+
   const openingCashValue =
     useMemo(
       () =>
         parseMoneyInput(
           openingCash
         ),
-      [openingCash]
+      [
+        openingCash
+      ]
     )
 
   const countedCashValue =
@@ -333,7 +407,9 @@ React.JSX.Element {
         parseMoneyInput(
           countedCash
         ),
-      [countedCash]
+      [
+        countedCash
+      ]
     )
 
   const expectedCash =
@@ -350,7 +426,8 @@ React.JSX.Element {
         return (
           openingCashValue +
           day.summary
-            .paymentMethods.cash
+            .paymentMethods
+            .cash
         )
       },
       [
@@ -381,13 +458,13 @@ React.JSX.Element {
       ]
     )
 
-  function handleOpenConfirmation():
+  function handleOpenClosingConfirmation():
   void {
     setMessage(null)
 
     if (
       !day ||
-      day.closing
+      isClosed
     ) {
       return
     }
@@ -418,18 +495,20 @@ React.JSX.Element {
       return
     }
 
-    setShowConfirmation(
+    setShowClosingConfirmation(
       true
     )
   }
 
-  function closeConfirmation():
+  function closeClosingConfirmation():
   void {
-    if (saving) {
+    if (
+      saving
+    ) {
       return
     }
 
-    setShowConfirmation(
+    setShowClosingConfirmation(
       false
     )
   }
@@ -439,7 +518,7 @@ React.JSX.Element {
     if (
       saving ||
       !day ||
-      day.closing ||
+      isClosed ||
       openingCashValue ===
         null ||
       countedCashValue ===
@@ -452,6 +531,9 @@ React.JSX.Element {
     setMessage(null)
 
     try {
+      const wasReopened =
+        isReopened
+
       const result =
         await window.pos
           .cashClosing
@@ -476,18 +558,21 @@ React.JSX.Element {
         return
       }
 
-      setShowConfirmation(
+      setShowClosingConfirmation(
         false
       )
 
       setMessage({
         type: 'success',
         text:
-          'Cierre de caja registrado correctamente.'
+          wasReopened
+            ? 'La caja fue cerrada nuevamente correctamente.'
+            : 'Cierre de caja registrado correctamente.'
       })
 
       await loadDay(
-        selectedDate
+        selectedDate,
+        false
       )
     } catch (
       error: unknown
@@ -504,6 +589,145 @@ React.JSX.Element {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  function handleOpenReopenConfirmation():
+  void {
+    setMessage(null)
+
+    if (
+      !day?.closing ||
+      day.closing.status !==
+        'CLOSED'
+    ) {
+      return
+    }
+
+    setReopenReason(
+      ''
+    )
+
+    setShowReopenConfirmation(
+      true
+    )
+  }
+
+  function closeReopenConfirmation():
+  void {
+    if (
+      reopening
+    ) {
+      return
+    }
+
+    setShowReopenConfirmation(
+      false
+    )
+
+    setReopenReason(
+      ''
+    )
+  }
+
+  async function handleConfirmReopen():
+  Promise<void> {
+    if (
+      reopening ||
+      !day?.closing ||
+      day.closing.status !==
+        'CLOSED'
+    ) {
+      return
+    }
+
+    const normalizedReason =
+      reopenReason.trim()
+
+    if (
+      normalizedReason.length <
+      3
+    ) {
+      setMessage({
+        type: 'error',
+        text:
+          'Debes indicar el motivo de la reapertura.'
+      })
+
+      return
+    }
+
+    if (
+      normalizedReason.length >
+      300
+    ) {
+      setMessage({
+        type: 'error',
+        text:
+          'El motivo de la reapertura no puede superar los 300 caracteres.'
+      })
+
+      return
+    }
+
+    setReopening(true)
+    setMessage(null)
+
+    try {
+      const result =
+        await window.pos
+          .cashClosing
+          .reopen({
+            date:
+              selectedDate,
+
+            reason:
+              normalizedReason
+          })
+
+      if (!result.success) {
+        setMessage({
+          type: 'error',
+          text:
+            result.message
+        })
+
+        return
+      }
+
+      setShowReopenConfirmation(
+        false
+      )
+
+      setReopenReason(
+        ''
+      )
+
+      setMessage({
+        type: 'success',
+        text:
+          'La caja fue reabierta correctamente. Las operaciones de la jornada vuelven a estar habilitadas.'
+      })
+
+      await loadDay(
+        selectedDate,
+        false
+      )
+    } catch (
+      error: unknown
+    ) {
+      console.error(
+        '[cash-closing] Error reopening closing:',
+        error
+      )
+
+      setMessage({
+        type: 'error',
+        text:
+          'No se pudo reabrir la caja.'
+      })
+    } finally {
+      setReopening(false)
     }
   }
 
@@ -529,6 +753,20 @@ React.JSX.Element {
     )}`
   }
 
+  function getEventTitle(
+    event:
+      CashClosingEvent
+  ): string {
+    if (
+      event.eventType ===
+      'REOPENED'
+    ) {
+      return 'Caja reabierta'
+    }
+
+    return 'Caja cerrada'
+  }
+
   return (
     <main className="page">
       <header className="page-header">
@@ -538,8 +776,9 @@ React.JSX.Element {
           </h1>
 
           <p>
-            Consulta el resumen diario y
-            registra el cierre de la jornada.
+            Consulta el resumen diario,
+            cierra la jornada o reabre
+            una caja cuando sea necesario.
           </p>
         </div>
 
@@ -556,12 +795,14 @@ React.JSX.Element {
             }
             disabled={
               loading ||
-              saving
+              saving ||
+              reopening
             }
             onChange={
               (event) =>
                 setSelectedDate(
-                  event.target.value
+                  event.target
+                    .value
                 )
             }
           />
@@ -606,9 +847,13 @@ React.JSX.Element {
               </h2>
             </div>
 
-            {day.closing ? (
+            {isClosed ? (
               <span className="cash-closing-status cash-closing-status-closed">
                 Caja cerrada
+              </span>
+            ) : isReopened ? (
+              <span className="cash-closing-status">
+                Caja reabierta
               </span>
             ) : (
               <span className="cash-closing-status">
@@ -782,7 +1027,8 @@ React.JSX.Element {
             </article>
 
             <article className="card">
-              {day.closing ? (
+              {isClosed &&
+              day.closing ? (
                 <>
                   <div className="card-header">
                     <div>
@@ -791,8 +1037,9 @@ React.JSX.Element {
                       </h2>
 
                       <p>
-                        Esta información corresponde
-                        al cierre guardado.
+                        La jornada está cerrada.
+                        Las ventas y modificaciones
+                        están bloqueadas.
                       </p>
                     </div>
                   </div>
@@ -861,6 +1108,13 @@ React.JSX.Element {
                             .cashDifference
                         )}
                       </strong>
+
+                      <small>
+                        {getDifferenceText(
+                          day.closing
+                            .cashDifference
+                        )}
+                      </small>
                     </div>
                   </div>
 
@@ -882,21 +1136,51 @@ React.JSX.Element {
                       )}
                     </span>
                   </div>
+
+                  <div className="modal-actions">
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      disabled={
+                        reopening ||
+                        saving
+                      }
+                      onClick={
+                        handleOpenReopenConfirmation
+                      }
+                    >
+                      Reabrir caja
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>
                   <div className="card-header">
                     <div>
                       <h2>
-                        Control de efectivo
+                        {isReopened
+                          ? 'Volver a cerrar caja'
+                          : 'Control de efectivo'}
                       </h2>
 
                       <p>
-                        Compara lo que debería haber
-                        en caja con el efectivo contado.
+                        {isReopened
+                          ? 'La caja fue reabierta. Cuando termine la jornada, cuenta nuevamente el efectivo y registra un nuevo cierre.'
+                          : 'Compara lo que debería haber en caja con el efectivo contado.'}
                       </p>
                     </div>
                   </div>
+
+                  {isReopened && (
+                    <div
+                      className="message message-success"
+                      role="status"
+                    >
+                      La caja está reabierta.
+                      Las operaciones de esta
+                      jornada están habilitadas.
+                    </div>
+                  )}
 
                   <div className="cash-closing-form">
                     <label>
@@ -910,7 +1194,8 @@ React.JSX.Element {
                           openingCash
                         }
                         disabled={
-                          saving
+                          saving ||
+                          reopening
                         }
                         onChange={
                           (event) =>
@@ -963,7 +1248,8 @@ React.JSX.Element {
                         }
                         placeholder="Ejemplo: 99500"
                         disabled={
-                          saving
+                          saving ||
+                          reopening
                         }
                         onChange={
                           (event) =>
@@ -1003,23 +1289,90 @@ React.JSX.Element {
                       type="button"
                       className="button button-primary"
                       disabled={
-                        saving
+                        saving ||
+                        reopening
                       }
                       onClick={
-                        handleOpenConfirmation
+                        handleOpenClosingConfirmation
                       }
                     >
-                      Confirmar cierre
+                      {isReopened
+                        ? 'Volver a cerrar caja'
+                        : 'Confirmar cierre'}
                     </button>
                   </div>
                 </>
               )}
             </article>
           </section>
+
+          {day.events.length >
+            0 && (
+            <section className="card">
+              <div className="card-header">
+                <div>
+                  <h2>
+                    Historial de la caja
+                  </h2>
+
+                  <p>
+                    Registro de cierres y
+                    reaperturas de esta jornada.
+                  </p>
+                </div>
+              </div>
+
+              <div className="payment-report-list">
+                {day.events.map(
+                  (event) => (
+                    <div
+                      key={
+                        event.id
+                      }
+                    >
+                      <div>
+                        <strong>
+                          {getEventTitle(
+                            event
+                          )}
+                        </strong>
+
+                        <small>
+                          {' '}
+                          por{' '}
+                          {
+                            event.username
+                          }
+                        </small>
+                      </div>
+
+                      <div>
+                        <strong>
+                          {formatStoredDateTime(
+                            event.createdAt
+                          )}
+                        </strong>
+
+                        {event.reason && (
+                          <small>
+                            {' '}
+                            · Motivo:{' '}
+                            {
+                              event.reason
+                            }
+                          </small>
+                        )}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            </section>
+          )}
         </>
       )}
 
-      {showConfirmation &&
+      {showClosingConfirmation &&
         day &&
         expectedCash !== null &&
         countedCashValue !==
@@ -1036,7 +1389,9 @@ React.JSX.Element {
             <h2
               id="cash-closing-confirm-title"
             >
-              Confirmar cierre de caja
+              {isReopened
+                ? 'Volver a cerrar caja'
+                : 'Confirmar cierre de caja'}
             </h2>
 
             <p>
@@ -1114,8 +1469,12 @@ React.JSX.Element {
             </div>
 
             <p>
-              Una vez registrado, no podrás
-              crear otro cierre para esta misma fecha.
+              Al cerrar la caja,
+              las ventas y cancelaciones
+              de esta jornada quedarán
+              bloqueadas hasta que un
+              administrador vuelva a
+              reabrirla.
             </p>
 
             <div className="modal-actions">
@@ -1126,7 +1485,7 @@ React.JSX.Element {
                   saving
                 }
                 onClick={
-                  closeConfirmation
+                  closeClosingConfirmation
                 }
               >
                 Volver
@@ -1144,7 +1503,116 @@ React.JSX.Element {
               >
                 {saving
                   ? 'Guardando...'
-                  : 'Registrar cierre'}
+                  : isReopened
+                    ? 'Cerrar nuevamente'
+                    : 'Registrar cierre'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showReopenConfirmation &&
+        day?.closing &&
+        day.closing.status ===
+          'CLOSED' && (
+        <div className="modal-backdrop">
+          <section
+            className="confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby=
+              "cash-closing-reopen-title"
+          >
+            <h2
+              id="cash-closing-reopen-title"
+            >
+              Reabrir caja
+            </h2>
+
+            <p>
+              Vas a reabrir la caja
+              correspondiente al{' '}
+              <strong>
+                {formatDate(
+                  selectedDate
+                )}
+              </strong>
+              .
+            </p>
+
+            <p>
+              Después de reabrirla,
+              las operaciones de la
+              jornada volverán a estar
+              habilitadas hasta que
+              registres un nuevo cierre.
+            </p>
+
+            <label>
+              Motivo de la reapertura
+
+              <textarea
+                className="cash-closing-reopen-reason"
+                value={
+                  reopenReason
+                }
+                maxLength={
+                  300
+                }
+                rows={
+                  4
+                }
+                placeholder="Ejemplo: La caja se cerró antes de terminar la jornada."
+                disabled={
+                  reopening
+                }
+                onChange={
+                  (event) =>
+                    setReopenReason(
+                      event.target
+                        .value
+                    )
+                }
+              />
+            </label>
+
+            <small>
+              {
+                reopenReason.trim()
+                  .length
+              } / 300 caracteres
+            </small>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                disabled={
+                  reopening
+                }
+                onClick={
+                  closeReopenConfirmation
+                }
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className="button button-primary"
+                disabled={
+                  reopening ||
+                  reopenReason.trim()
+                    .length < 3
+                }
+                onClick={() =>
+                  void handleConfirmReopen()
+                }
+              >
+                {reopening
+                  ? 'Reabriendo...'
+                  : 'Reabrir caja'}
               </button>
             </div>
           </section>

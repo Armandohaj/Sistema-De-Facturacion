@@ -1,8 +1,15 @@
-export type UserRole = 'ADMIN' | 'EMPLOYEE'
+export type UserRole =
+  | 'ADMIN'
+  | 'EMPLOYEE'
 
-export type PaymentMethod = 'CASH' | 'CARD' | 'SINPE'
+export type PaymentMethod =
+  | 'CASH'
+  | 'CARD'
+  | 'SINPE'
 
-export type SaleStatus = 'COMPLETED' | 'CANCELED'
+export type SaleStatus =
+  | 'COMPLETED'
+  | 'CANCELED'
 
 export interface AuthUser {
   id: number
@@ -56,7 +63,8 @@ export interface CategoryInput {
   discountPercent: number
 }
 
-export interface UpdateCategoryInput extends CategoryInput {
+export interface UpdateCategoryInput
+  extends CategoryInput {
   id: number
 }
 
@@ -64,12 +72,14 @@ export interface InventoryMovement {
   id: number
   categoryId: number
   categoryName: string
+
   movementType:
     | 'INITIAL_STOCK'
     | 'MANUAL_ADDITION'
     | 'MANUAL_REMOVAL'
     | 'SALE'
     | 'SALE_CANCELLATION'
+
   quantityChange: number
   stockBefore: number
   stockAfter: number
@@ -167,10 +177,10 @@ export interface SaleDetailItem {
   total: number
 }
 
-export interface SaleDetail extends SaleHistoryItem {
+export interface SaleDetail
+  extends SaleHistoryItem {
   items: SaleDetailItem[]
 }
-
 
 export interface SalesPeriodSummary {
   salesCount: number
@@ -212,7 +222,6 @@ export interface ReportSummary {
   monthlyHistory: MonthlySalesPoint[]
 }
 
-
 export interface MonthlyReport {
   month: string
   completedSalesCount: number
@@ -245,15 +254,29 @@ export interface DailyClosingSummary {
 
   total: number
 
-  paymentMethods: CashClosingPaymentSummary
+  paymentMethods:
+    CashClosingPaymentSummary
 
-  mostSold: DailyProductSummary | null
-  leastSold: DailyProductSummary | null
+  mostSold:
+    DailyProductSummary | null
+
+  leastSold:
+    DailyProductSummary | null
 }
+
+export type CashClosingStatus =
+  | 'CLOSED'
+  | 'REOPENED'
+
+export type CashClosingEventType =
+  | 'CLOSED'
+  | 'REOPENED'
 
 export interface CashClosing {
   id: number
   businessDate: string
+
+  status: CashClosingStatus
 
   completedSalesCount: number
   canceledSalesCount: number
@@ -274,15 +297,40 @@ export interface CashClosing {
   closedAt: string
 }
 
+export interface CashClosingEvent {
+  id: number
+  cashClosingId: number
+
+  eventType:
+    CashClosingEventType
+
+  userId: number
+  username: string
+
+  reason: string | null
+
+  createdAt: string
+}
+
 export interface CashClosingDay {
   summary: DailyClosingSummary
-  closing: CashClosing | null
+
+  closing:
+    CashClosing | null
+
+  events:
+    CashClosingEvent[]
 }
 
 export interface CreateCashClosingInput {
   date: string
   openingCash: number
   countedCash: number
+}
+
+export interface ReopenCashClosingInput {
+  date: string
+  reason: string
 }
 
 export type IpcResult<T> =
@@ -297,106 +345,159 @@ export type IpcResult<T> =
 
 export interface PosApi {
   app: {
-    getInfo: () => Promise<AppInfo>
+    getInfo:
+      () => Promise<AppInfo>
   }
 
   auth: {
-    getStatus: () => Promise<IpcResult<AuthStatus>>
+    getStatus:
+      () => Promise<
+        IpcResult<AuthStatus>
+      >
 
     setup: (
       input: SetupAdminInput
-    ) => Promise<IpcResult<AuthUser>>
+    ) => Promise<
+      IpcResult<AuthUser>
+    >
 
     login: (
       input: LoginInput
-    ) => Promise<IpcResult<AuthUser>>
+    ) => Promise<
+      IpcResult<AuthUser>
+    >
 
-    logout: () => Promise<IpcResult<null>>
+    logout:
+      () => Promise<
+        IpcResult<null>
+      >
   }
 
   database: {
-    getStatus: () => Promise<DatabaseStatus>
+    getStatus:
+      () => Promise<
+        DatabaseStatus
+      >
   }
 
   categories: {
-    list: () => Promise<IpcResult<Category[]>>
+    list:
+      () => Promise<
+        IpcResult<Category[]>
+      >
 
     create: (
       input: CategoryInput
-    ) => Promise<IpcResult<Category>>
+    ) => Promise<
+      IpcResult<Category>
+    >
 
     update: (
       input: UpdateCategoryInput
-    ) => Promise<IpcResult<Category>>
+    ) => Promise<
+      IpcResult<Category>
+    >
 
     setActive: (
       id: number,
       active: boolean
-    ) => Promise<IpcResult<Category>>
+    ) => Promise<
+      IpcResult<Category>
+    >
   }
 
   inventory: {
     listRecent: (
       limit?: number
-    ) => Promise<IpcResult<InventoryMovement[]>>
+    ) => Promise<
+      IpcResult<
+        InventoryMovement[]
+      >
+    >
   }
 
   users: {
-    list: () => Promise<IpcResult<UserRecord[]>>
+    list:
+      () => Promise<
+        IpcResult<UserRecord[]>
+      >
 
     create: (
       input: CreateUserInput
-    ) => Promise<IpcResult<UserRecord>>
+    ) => Promise<
+      IpcResult<UserRecord>
+    >
 
     update: (
       input: UpdateUserInput
-    ) => Promise<IpcResult<UserRecord>>
+    ) => Promise<
+      IpcResult<UserRecord>
+    >
   }
 
   sales: {
     create: (
       input: CreateSaleInput
-    ) => Promise<IpcResult<Sale>>
+    ) => Promise<
+      IpcResult<Sale>
+    >
 
     listHistory: (
-      filters?: SaleHistoryFilters
-    ) => Promise<IpcResult<SaleHistoryItem[]>>
+      filters?:
+        SaleHistoryFilters
+    ) => Promise<
+      IpcResult<
+        SaleHistoryItem[]
+      >
+    >
 
     getDetail: (
       saleId: number
-    ) => Promise<IpcResult<SaleDetail>>
+    ) => Promise<
+      IpcResult<SaleDetail>
+    >
 
     cancel: (
       saleId: number
-    ) => Promise<IpcResult<SaleDetail>>
+    ) => Promise<
+      IpcResult<SaleDetail>
+    >
   }
 
   reports: {
-  getSummary: () => Promise<
-    IpcResult<ReportSummary>
-  >
+    getSummary:
+      () => Promise<
+        IpcResult<ReportSummary>
+      >
 
-  getMonthlyReport: (
-    month: string
-  ) => Promise<
-    IpcResult<MonthlyReport>
-  >
-}
+    getMonthlyReport: (
+      month: string
+    ) => Promise<
+      IpcResult<MonthlyReport>
+    >
+  }
 
-cashClosing: {
-  getDay: (
-    date: string
-  ) => Promise<
-    IpcResult<CashClosingDay>
-  >
+  cashClosing: {
+    getDay: (
+      date: string
+    ) => Promise<
+      IpcResult<CashClosingDay>
+    >
 
-  create: (
-    input: CreateCashClosingInput
-  ) => Promise<
-    IpcResult<CashClosing>
-  >
-}
+    create: (
+      input:
+        CreateCashClosingInput
+    ) => Promise<
+      IpcResult<CashClosing>
+    >
 
+    reopen: (
+      input:
+        ReopenCashClosingInput
+    ) => Promise<
+      IpcResult<CashClosing>
+    >
+  }
 }
 
 declare global {

@@ -1346,3 +1346,19 @@ select:focus {
     flex-direction: column;
   }
 }
+
+.cash-closing-reopen-reason {
+  resize: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.login-logo {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  max-height: 150px;
+  height: auto;
+  object-fit: contain;
+  margin: 0 auto 16px;
+}

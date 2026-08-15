@@ -3,13 +3,15 @@ import {
 } from 'electron'
 
 import {
-  requireAdmin
+  requireUser
 } from '../auth/auth.service'
 
 import {
   createCashClosing,
   getCashClosingDay,
-  type CreateCashClosingInput
+  reopenCashClosing,
+  type CreateCashClosingInput,
+  type ReopenCashClosingInput
 } from '../cash-closing/cash-closing.service'
 
 function getErrorMessage(
@@ -21,13 +23,15 @@ function getErrorMessage(
     return error.message
   }
 
-  return (
-    'Ocurrió un error inesperado.'
-  )
+  return 'Ocurrió un error inesperado.'
 }
 
 export function registerCashClosingIpc():
 void {
+  /*
+   * ADMIN y EMPLOYEE pueden consultar
+   * la información del cierre de caja.
+   */
   ipcMain.handle(
     'cash-closing:get-day',
 
@@ -36,7 +40,7 @@ void {
       date: string
     ) => {
       try {
-        requireAdmin()
+        requireUser()
 
         return {
           success: true as const,
@@ -66,6 +70,13 @@ void {
     }
   )
 
+  /*
+   * ADMIN y EMPLOYEE pueden cerrar
+   * una jornada.
+   *
+   * También permite volver a cerrar
+   * una caja que fue reabierta.
+   */
   ipcMain.handle(
     'cash-closing:create',
 
@@ -76,7 +87,7 @@ void {
     ) => {
       try {
         const user =
-          requireAdmin()
+          requireUser()
 
         const closing =
           createCashClosing(
@@ -93,6 +104,55 @@ void {
       ) {
         console.error(
           '[cash-closing:create]',
+          error
+        )
+
+        return {
+          success: false as const,
+
+          message:
+            getErrorMessage(
+              error
+            )
+        }
+      }
+    }
+  )
+
+  /*
+   * ADMIN y EMPLOYEE pueden reabrir
+   * una caja cerrada.
+   *
+   * El usuario y el motivo quedan
+   * registrados en el historial.
+   */
+  ipcMain.handle(
+    'cash-closing:reopen',
+
+    (
+      _event,
+      input:
+        ReopenCashClosingInput
+    ) => {
+      try {
+        const user =
+          requireUser()
+
+        const closing =
+          reopenCashClosing(
+            input,
+            user.id
+          )
+
+        return {
+          success: true as const,
+          data: closing
+        }
+      } catch (
+        error: unknown
+      ) {
+        console.error(
+          '[cash-closing:reopen]',
           error
         )
 
